@@ -21,17 +21,20 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/verify`,
         },
       });
 
       if (error) throw error;
       
-      toast.success("Verification email sent! Please check your inbox.");
+      if (data.user) {
+        toast.success("Account created! Redirecting to verification...");
+        navigate("/verify");
+      }
     } catch (error: any) {
       toast.error(error.message || "An error occurred during sign up");
     } finally {
@@ -44,15 +47,29 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
       
-      toast.success("Logged in successfully!");
-      navigate("/");
+      // Check if both email and phone are verified
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email_verified, phone_verified")
+          .eq("id", data.user.id)
+          .single();
+
+        if (profile && profile.email_verified && profile.phone_verified) {
+          toast.success("Logged in successfully!");
+          navigate("/dashboard");
+        } else {
+          toast.info("Please verify your email and phone");
+          navigate("/verify");
+        }
+      }
     } catch (error: any) {
       toast.error(error.message || "An error occurred during sign in");
     } finally {
@@ -65,16 +82,19 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         phone,
         password,
       });
 
       if (error) throw error;
       
-      toast.success("OTP sent to your phone! Please verify.");
+      if (data.user) {
+        toast.success("Account created! Redirecting to verification...");
+        navigate("/verify");
+      }
     } catch (error: any) {
-      toast.error(error.message || "An error occurred");
+      toast.error(error.message || "An error occurred. Make sure phone auth is configured in Cloud.");
     } finally {
       setLoading(false);
     }

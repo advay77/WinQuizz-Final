@@ -14,7 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      games: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          entry_fee: number | null
+          id: string
+          prize_amount: number | null
+          prize_description: string | null
+          status: string | null
+          time_limit_minutes: number | null
+          title: string
+          total_questions: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          entry_fee?: number | null
+          id?: string
+          prize_amount?: number | null
+          prize_description?: string | null
+          status?: string | null
+          time_limit_minutes?: number | null
+          title: string
+          total_questions?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          entry_fee?: number | null
+          id?: string
+          prize_amount?: number | null
+          prize_description?: string | null
+          status?: string | null
+          time_limit_minutes?: number | null
+          title?: string
+          total_questions?: number | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          email_verified: boolean | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          phone_verified: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          email_verified?: boolean | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          phone_verified?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          email_verified?: boolean | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          phone_verified?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_game_progress: {
+        Row: {
+          completed_at: string | null
+          correct_answers: number | null
+          created_at: string | null
+          game_id: string
+          id: string
+          score: number | null
+          status: string | null
+          time_taken_seconds: number | null
+          total_questions: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          correct_answers?: number | null
+          created_at?: string | null
+          game_id: string
+          id?: string
+          score?: number | null
+          status?: string | null
+          time_taken_seconds?: number | null
+          total_questions?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          correct_answers?: number | null
+          created_at?: string | null
+          game_id?: string
+          id?: string
+          score?: number | null
+          status?: string | null
+          time_taken_seconds?: number | null
+          total_questions?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_game_progress_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_game_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
