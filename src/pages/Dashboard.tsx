@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trophy, LogOut, TrendingUp, Target, Clock, Award } from "lucide-react";
+import { Trophy, LogOut, TrendingUp, Target, Clock, Award, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 
@@ -54,8 +54,15 @@ const Dashboard = () => {
   const checkAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      // Check if session is still valid
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         navigate("/auth");
         return;
       }
@@ -70,7 +77,7 @@ const Dashboard = () => {
         .single();
 
       if (profileError) throw profileError;
-      
+
       // Check if both email and phone are verified
       if (!profileData.email_verified || !profileData.phone_verified) {
         toast.error("Please verify both email and phone to access the dashboard");
@@ -119,8 +126,8 @@ const Dashboard = () => {
 
   const completedGames = progress.filter(p => p.status === "completed");
   const totalScore = completedGames.reduce((sum, p) => sum + p.score, 0);
-  const averageScore = completedGames.length > 0 
-    ? Math.round(totalScore / completedGames.length) 
+  const averageScore = completedGames.length > 0
+    ? Math.round(totalScore / completedGames.length)
     : 0;
 
   if (loading) {
@@ -159,150 +166,108 @@ const Dashboard = () => {
           <p className="text-xl text-muted-foreground">Ready to test your skills and win big?</p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Target className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Games Played</p>
-                  <p className="text-3xl font-bold">{progress.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Award className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Completed</p>
-                  <p className="text-3xl font-bold">{completedGames.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <TrendingUp className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Avg Score</p>
-                  <p className="text-3xl font-bold">{averageScore}%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Clock className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
-                  <p className="text-3xl font-bold">
-                    {progress.filter(p => p.status === "in_progress").length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Available Games */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-6">Available Games</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {games.filter(g => g.status === "active").map((game) => (
-              <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-xl">{game.title}</CardTitle>
-                  <CardDescription>{game.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Prize:</span>
-                      <span className="font-semibold text-primary">{game.prize_description}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Questions:</span>
-                      <span className="font-semibold">{game.total_questions}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Time Limit:</span>
-                      <span className="font-semibold">{game.time_limit_minutes} min</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Entry Fee:</span>
-                      <span className="font-semibold">₹{game.entry_fee}</span>
-                    </div>
-                    <Button className="w-full bg-primary hover:bg-primary/90 mt-2">
-                      Play Now
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        {/* Sidebar Navigation */}
+        <div className="flex gap-6 mb-8">
+          <div className="w-64 bg-white rounded-lg shadow-sm border p-4">
+            <h3 className="font-semibold mb-4 text-lg">Navigation</h3>
+            <div className="space-y-2">
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => navigate("/dashboard")}
+              >
+                <Trophy className="h-4 w-4 mr-2" />
+                Dashboard
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => navigate("/progress")}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Progress
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Recent Progress */}
-        {progress.length > 0 && (
-          <div>
-            <h2 className="text-3xl font-bold mb-6">Your Recent Games</h2>
-            <div className="space-y-4">
-              {progress.slice(0, 5).map((prog) => {
-                const game = getGameById(prog.game_id);
-                if (!game) return null;
-
-                return (
-                  <Card key={prog.id} className="border-2">
-                    <CardContent className="pt-6">
-                      <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div>
-                          <h3 className="font-bold text-lg">{game.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {prog.status === "completed" 
-                              ? `Completed on ${new Date(prog.completed_at!).toLocaleDateString()}`
-                              : "In Progress"}
-                          </p>
+          <div className="flex-1">
+            {/* Live Quizzes Section */}
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold mb-6">Live Quizzes</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {games.filter(g => g.status === "active").map((game) => (
+                  <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg">
+                    <CardHeader>
+                      <CardTitle className="text-xl">{game.title}</CardTitle>
+                      <CardDescription>{game.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Prize:</span>
+                          <span className="font-semibold text-primary">{game.prize_description}</span>
                         </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-center">
-                            <p className="text-2xl font-bold text-primary">{prog.score}%</p>
-                            <p className="text-xs text-muted-foreground">Score</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-2xl font-bold">{prog.correct_answers}/{prog.total_questions}</p>
-                            <p className="text-xs text-muted-foreground">Correct</p>
-                          </div>
-                          {prog.time_taken_seconds && (
-                            <div className="text-center">
-                              <p className="text-2xl font-bold">{Math.floor(prog.time_taken_seconds / 60)}m</p>
-                              <p className="text-xs text-muted-foreground">Time</p>
-                            </div>
-                          )}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Questions:</span>
+                          <span className="font-semibold">{game.total_questions}</span>
                         </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Time Limit:</span>
+                          <span className="font-semibold">{game.time_limit_minutes} min</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Entry Fee:</span>
+                          <span className="font-semibold">₹{game.entry_fee}</span>
+                        </div>
+                        <Button className="w-full bg-primary hover:bg-primary/90 mt-2">
+                          Play Now
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
+                ))}
+              </div>
+            </div>
+
+            {/* Upcoming Quizzes Section */}
+            <div>
+              <h2 className="text-3xl font-bold mb-6">Upcoming Quizzes</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {games.filter(g => g.status === "upcoming").map((game) => (
+                  <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg opacity-75">
+                    <CardHeader>
+                      <CardTitle className="text-xl">{game.title}</CardTitle>
+                      <CardDescription>{game.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Prize:</span>
+                          <span className="font-semibold text-primary">{game.prize_description}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Questions:</span>
+                          <span className="font-semibold">{game.total_questions}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Time Limit:</span>
+                          <span className="font-semibold">{game.time_limit_minutes} min</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Entry Fee:</span>
+                          <span className="font-semibold">₹{game.entry_fee}</span>
+                        </div>
+                        <Button className="w-full bg-muted hover:bg-muted/90 mt-2" disabled>
+                          Coming Soon
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -32,10 +33,10 @@ const Auth = () => {
       if (error) throw error;
       
       if (data.user) {
-        // Update profile with phone number
+        // Update profile with phone number and full name
         await supabase
           .from("profiles")
-          .update({ phone })
+          .update({ phone, full_name: fullName })
           .eq("id", data.user.id);
 
         toast.success("Account created! Redirecting to verification...");
@@ -104,6 +105,17 @@ const Auth = () => {
 
             <TabsContent value="signup">
               <form onSubmit={handleEmailSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-fullname">Full Name</Label>
+                  <Input
+                    id="signup-fullname"
+                    type="text"
+                    placeholder="John Doe"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
