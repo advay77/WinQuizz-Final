@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, LogOut, TrendingUp, Target, Clock, Award, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import Navbar from "@/components/Navbar";
 import type { User } from "@supabase/supabase-js";
 
 interface Profile {
@@ -78,7 +79,13 @@ const Progress = () => {
 
       if (profileError) throw profileError;
 
-      // Check if both email and phone are verified
+      // Check if profile exists and both email and phone are verified
+      if (!profileData) {
+        toast.error("Profile not found. Please contact support.");
+        navigate("/auth");
+        return;
+      }
+
       if (!profileData.email_verified || !profileData.phone_verified) {
         toast.error("Please verify both email and phone to access the dashboard");
         navigate("/verify");
@@ -146,39 +153,21 @@ const Progress = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/30">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/dashboard")}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-              <div className="flex items-center gap-2">
-                <Trophy className="h-8 w-8 text-primary" />
-                <span className="text-2xl font-bold">WinQuizz</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                Welcome, {profile?.full_name || user?.email}
-              </span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20"> {/* Added pt-20 for navbar spacing */}
+        {/* Back to Dashboard Button */}
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </div>
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>

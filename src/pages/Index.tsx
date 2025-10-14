@@ -11,45 +11,69 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    const checkAuth = async () => {
+      try {
+        // 🔹 Fetch user info
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: { session } } = await supabase.auth.getSession();
+        // 🔹 Fetch session info
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      if (user && session) {
-        // Check if user is admin
+        // 🚫 No user or session -> stay on landing page
+        if (!user || !session) return;
+
+        // 🔹 Admin check
         if (user.email === "admin.winquizz@gmail.com") {
           navigate("/admin");
-        } else {
-          // Check if both email and phone are verified
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("email_verified, phone_verified")
-            .eq("id", user.id)
-            .single();
-
-          if (profile?.email_verified && profile?.phone_verified) {
-            navigate("/dashboard");
-          } else {
-            navigate("/verify");
-          }
+          return;
         }
+
+        // 🔹 Fetch profile info for verification status
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("email_verified, phone_verified")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error fetching profile:", error);
+          return;
+        }
+
+        if (!profile) {
+          console.warn("Profile not found for user:", user.id);
+          return;
+        }
+
+        // ✅ Check verification status
+        if ((profile as { email_verified: boolean; phone_verified: boolean }).email_verified &&
+            (profile as { email_verified: boolean; phone_verified: boolean }).phone_verified) {
+          navigate("/dashboard");
+        } else {
+          navigate("/verify");
+        }
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+        // stay on landing page if anything fails
       }
-    } catch (error) {
-      // User not authenticated, stay on landing page
-    }
-  };
+    };
+
+    checkAuth();
+  }, [navigate]);
 
   return (
     <div className="min-h-screen">
       <Navbar />
-      <HeroSection />
-      <FeaturesSection />
-      <PrizesSection />
-      <Footer />
+      <div className="pt-16"> {/* Add padding-top to account for fixed navbar */}
+        <HeroSection />
+        <FeaturesSection />
+        <PrizesSection />
+        <Footer />
+      </div>
     </div>
   );
 };

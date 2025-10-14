@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Shield, LogOut, CheckCircle, XCircle, Eye, DollarSign } from "lucide-react";
 import { toast } from "sonner";
+import Navbar from "@/components/Navbar";
 import type { User } from "@supabase/supabase-js";
 
 interface Profile {
@@ -214,22 +215,10 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/30">
-      {/* Header */}
-      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">WinQuizz Admin</span>
-          </div>
-          <Button variant="ghost" onClick={handleLogout} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background">
+      <Navbar />
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 pt-20">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>

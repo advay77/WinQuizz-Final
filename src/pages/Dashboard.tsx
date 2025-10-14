@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, LogOut, TrendingUp, Target, Clock, Award, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import Navbar from "@/components/Navbar";
 import type { User } from "@supabase/supabase-js";
 
 interface Profile {
@@ -78,8 +79,14 @@ const Dashboard = () => {
 
       if (profileError) throw profileError;
 
-      // Check if both email and phone are verified
-      if (!profileData.email_verified || !profileData.phone_verified) {
+      // Check if profile exists and both email and phone are verified
+      if (!profileData) {
+        toast.error("Profile not found. Please contact support.");
+        navigate("/auth");
+        return;
+      }
+
+      if (!(profileData as Profile).email_verified || !(profileData as Profile).phone_verified) {
         toast.error("Please verify both email and phone to access the dashboard");
         navigate("/verify");
         return;
@@ -143,21 +150,9 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/30">
-      {/* Header */}
-      <header className="bg-background/95 backdrop-blur border-b border-border sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">WinQuizz</span>
-          </div>
-          <Button variant="ghost" onClick={handleLogout} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </header>
+      <Navbar />
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 pt-20"> {/* Added pt-20 to account for navbar */}
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">
@@ -166,105 +161,81 @@ const Dashboard = () => {
           <p className="text-xl text-muted-foreground">Ready to test your skills and win big?</p>
         </div>
 
-        {/* Sidebar Navigation */}
-        <div className="flex gap-6 mb-8">
-          <div className="w-64 bg-white rounded-lg shadow-sm border p-4">
-            <h3 className="font-semibold mb-4 text-lg">Navigation</h3>
-            <div className="space-y-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => navigate("/dashboard")}
-              >
-                <Trophy className="h-4 w-4 mr-2" />
-                Dashboard
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => navigate("/progress")}
-              >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Progress
-              </Button>
+        {/* Main Content - Removed Sidebar */}
+        <div className="mb-8">
+          {/* Live Quizzes Section */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-6">Live Quizzes</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {games.filter(g => g.status === "active").map((game) => (
+                <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-xl">{game.title}</CardTitle>
+                    <CardDescription>{game.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Prize:</span>
+                        <span className="font-semibold text-primary">{game.prize_description}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Questions:</span>
+                        <span className="font-semibold">{game.total_questions}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Time Limit:</span>
+                        <span className="font-semibold">{game.time_limit_minutes} min</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Entry Fee:</span>
+                        <span className="font-semibold">₹{game.entry_fee}</span>
+                      </div>
+                      <Button className="w-full bg-primary hover:bg-primary/90 mt-2">
+                        Play Now
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
 
-          <div className="flex-1">
-            {/* Live Quizzes Section */}
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold mb-6">Live Quizzes</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {games.filter(g => g.status === "active").map((game) => (
-                  <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="text-xl">{game.title}</CardTitle>
-                      <CardDescription>{game.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Prize:</span>
-                          <span className="font-semibold text-primary">{game.prize_description}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Questions:</span>
-                          <span className="font-semibold">{game.total_questions}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Time Limit:</span>
-                          <span className="font-semibold">{game.time_limit_minutes} min</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Entry Fee:</span>
-                          <span className="font-semibold">₹{game.entry_fee}</span>
-                        </div>
-                        <Button className="w-full bg-primary hover:bg-primary/90 mt-2">
-                          Play Now
-                        </Button>
+          {/* Upcoming Quizzes Section */}
+          <div>
+            <h2 className="text-3xl font-bold mb-6">Upcoming Quizzes</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {games.filter(g => g.status === "upcoming").map((game) => (
+                <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg opacity-75">
+                  <CardHeader>
+                    <CardTitle className="text-xl">{game.title}</CardTitle>
+                    <CardDescription>{game.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Prize:</span>
+                        <span className="font-semibold text-primary">{game.prize_description}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            {/* Upcoming Quizzes Section */}
-            <div>
-              <h2 className="text-3xl font-bold mb-6">Upcoming Quizzes</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {games.filter(g => g.status === "upcoming").map((game) => (
-                  <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg opacity-75">
-                    <CardHeader>
-                      <CardTitle className="text-xl">{game.title}</CardTitle>
-                      <CardDescription>{game.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Prize:</span>
-                          <span className="font-semibold text-primary">{game.prize_description}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Questions:</span>
-                          <span className="font-semibold">{game.total_questions}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Time Limit:</span>
-                          <span className="font-semibold">{game.time_limit_minutes} min</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Entry Fee:</span>
-                          <span className="font-semibold">₹{game.entry_fee}</span>
-                        </div>
-                        <Button className="w-full bg-muted hover:bg-muted/90 mt-2" disabled>
-                          Coming Soon
-                        </Button>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Questions:</span>
+                        <span className="font-semibold">{game.total_questions}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Time Limit:</span>
+                        <span className="font-semibold">{game.time_limit_minutes} min</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Entry Fee:</span>
+                        <span className="font-semibold">₹{game.entry_fee}</span>
+                      </div>
+                      <Button className="w-full bg-muted hover:bg-muted/90 mt-2" disabled>
+                        Coming Soon
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         </div>
