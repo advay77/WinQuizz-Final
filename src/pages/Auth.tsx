@@ -32,6 +32,12 @@ const Auth = () => {
       if (error) throw error;
       
       if (data.user) {
+        // Update profile with phone number
+        await supabase
+          .from("profiles")
+          .update({ phone })
+          .eq("id", data.user.id);
+
         toast.success("Account created! Redirecting to verification...");
         navigate("/verify");
       }
@@ -77,116 +83,65 @@ const Auth = () => {
     }
   };
 
-  const handlePhoneSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        phone,
-        password,
-      });
-
-      if (error) throw error;
-      
-      if (data.user) {
-        toast.success("Account created! Redirecting to verification...");
-        navigate("/verify");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "An error occurred. Make sure phone auth is configured in Cloud.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-secondary/30 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-background py-12">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Link to="/" className="flex items-center justify-center gap-2 mb-4">
-            <Trophy className="h-10 w-10 text-primary" />
-            <span className="text-3xl font-bold">WinQuizz</span>
-          </Link>
-          <CardTitle className="text-2xl">Welcome!</CardTitle>
-          <CardDescription>Sign up or login to start competing</CardDescription>
+        <CardHeader className="space-y-1">
+          <div className="flex items-center justify-center mb-4">
+            <Trophy className="h-12 w-12 text-primary" />
+          </div>
+          <CardTitle className="text-2xl text-center">Welcome to WinQuizz</CardTitle>
+          <CardDescription className="text-center">
+            Sign up to participate in exciting quizzes and win amazing prizes
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signup" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
               <TabsTrigger value="login">Login</TabsTrigger>
             </TabsList>
 
             <TabsContent value="signup">
-              <Tabs defaultValue="email" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="email">Email</TabsTrigger>
-                  <TabsTrigger value="phone">Phone</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="email">
-                  <form onSubmit={handleEmailSignUp} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password</Label>
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
-                      {loading ? "Processing..." : "Sign Up with Email"}
-                    </Button>
-                  </form>
-                </TabsContent>
-
-                <TabsContent value="phone">
-                  <form onSubmit={handlePhoneSignUp} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-phone">Phone Number</Label>
-                      <Input
-                        id="signup-phone"
-                        type="tel"
-                        placeholder="+91 1234567890"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-phone-password">Password</Label>
-                      <Input
-                        id="signup-phone-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
-                      {loading ? "Processing..." : "Sign Up with Phone"}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
+              <form onSubmit={handleEmailSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">Phone Number</Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="+91 1234567890"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
+                  {loading ? "Processing..." : "Sign Up"}
+                </Button>
+              </form>
             </TabsContent>
 
             <TabsContent value="login">

@@ -8,24 +8,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Trophy, Mail, Phone, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
+import { sendEmailOTP } from "@/lib/emailService";
+import { sendSMSOTP } from "@/lib/smsService";
 
 const Verify = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [emailVerified, setEmailVerified] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneOtp, setPhoneOtp] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [emailVerificationCode, setEmailVerificationCode] = useState<string | null>(null);
+  const [phoneVerificationCode, setPhoneVerificationCode] = useState<string | null>(null);
 
   useEffect(() => {
     checkVerificationStatus();
   }, []);
 
+  const generateOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
   const checkVerificationStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       navigate("/auth");
       return;
@@ -33,14 +42,15 @@ const Verify = () => {
 
     setUser(user);
 
-    // Check profile for verification status
+    // Check profile for verification status and phone number
     const { data: profile } = await supabase
       .from("profiles")
-      .select("email_verified, phone_verified")
+      .select("email_verified, phone_verified, phone")
       .eq("id", user.id)
       .single();
 
     if (profile) {
+      setProfile(profile);
       setEmailVerified(profile.email_verified);
       setPhoneVerified(profile.phone_verified);
 
@@ -54,18 +64,19 @@ const Verify = () => {
 
   const handleSendEmailOtp = async () => {
     if (!user?.email) return;
-    
+
+    const otp = generateOTP();
+    setEmailVerificationCode(otp);
+
     setSendingOtp(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: user.email,
-        options: {
-          shouldCreateUser: false,
-        }
-      });
-
-      if (error) throw error;
-      toast.success("Verification code sent to your email!");
+      const success = await sendEmailOTP(user.email, otp);
+      if (success) {
+        toast.success("Verification code sent to your email!");
+        console.log(`📧 Email OTP sent to ${user.email}: ${otp}`); // For development
+      } else {
+        toast.error("Failed to send email. Please try again.");
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to send OTP");
     } finally {
@@ -79,23 +90,19 @@ const Verify = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: user.email,
-        token: emailOtp,
-        type: "email"
-      });
+      if (emailOtp === emailVerificationCode) {
+        // Update profile
+        await supabase
+          .from("profiles")
+          .update({ email_verified: true })
+          .eq("id", user.id);
 
-      if (error) throw error;
-
-      // Update profile
-      await supabase
-        .from("profiles")
-        .update({ email_verified: true })
-        .eq("id", user.id);
-
-      setEmailVerified(true);
-      toast.success("Email verified successfully!");
-      checkVerificationStatus();
+        setEmailVerified(true);
+        toast.success("Email verified successfully!");
+        checkVerificationStatus();
+      } else {
+        toast.error("Invalid verification code");
+      }
     } catch (error: any) {
       toast.error(error.message || "Invalid verification code");
     } finally {
@@ -104,22 +111,23 @@ const Verify = () => {
   };
 
   const handleSendPhoneOtp = async () => {
-    if (!user?.phone) {
+    if (!profile?.phone) {
       toast.error("Phone number not found. Please update your profile.");
       return;
     }
-    
+
+    const otp = generateOTP();
+    setPhoneVerificationCode(otp);
+
     setSendingOtp(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: user.phone,
-        options: {
-          shouldCreateUser: false,
-        }
-      });
-
-      if (error) throw error;
-      toast.success("Verification code sent to your phone!");
+      const success = await sendSMSOTP(profile.phone, otp);
+      if (success) {
+        toast.success("Verification code sent to your phone!");
+        console.log(`📱 SMS OTP sent to ${profile.phone}: ${otp}`); // For development
+      } else {
+        toast.error("Failed to send SMS. Please try again.");
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to send OTP. Make sure phone provider is configured.");
     } finally {
@@ -129,27 +137,23 @@ const Verify = () => {
 
   const handleVerifyPhone = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.phone) return;
+    if (!profile?.phone) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: user.phone,
-        token: phoneOtp,
-        type: "sms"
-      });
+      if (phoneOtp === phoneVerificationCode) {
+        // Update profile
+        await supabase
+          .from("profiles")
+          .update({ phone_verified: true })
+          .eq("id", user.id);
 
-      if (error) throw error;
-
-      // Update profile
-      await supabase
-        .from("profiles")
-        .update({ phone_verified: true })
-        .eq("id", user.id);
-
-      setPhoneVerified(true);
-      toast.success("Phone verified successfully!");
-      checkVerificationStatus();
+        setPhoneVerified(true);
+        toast.success("Phone verified successfully!");
+        checkVerificationStatus();
+      } else {
+        toast.error("Invalid verification code");
+      }
     } catch (error: any) {
       toast.error(error.message || "Invalid verification code");
     } finally {
@@ -184,8 +188,8 @@ const Verify = () => {
                 Email Verification
               </CardTitle>
               <CardDescription>
-                {emailVerified 
-                  ? "Your email has been verified!" 
+                {emailVerified
+                  ? "Your email has been verified!"
                   : `Verify ${user?.email || "your email"}`}
               </CardDescription>
             </CardHeader>
@@ -244,9 +248,9 @@ const Verify = () => {
                 Phone Verification
               </CardTitle>
               <CardDescription>
-                {phoneVerified 
-                  ? "Your phone has been verified!" 
-                  : `Verify ${user?.phone || "your phone number"}`}
+                {phoneVerified
+                  ? "Your phone has been verified!"
+                  : `Verify ${profile?.phone || "your phone number"}`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -269,7 +273,7 @@ const Verify = () => {
                       type="button"
                       variant="outline"
                       onClick={handleSendPhoneOtp}
-                      disabled={sendingOtp || !user?.phone}
+                      disabled={sendingOtp || !profile?.phone}
                       className="flex-1"
                     >
                       {sendingOtp ? "Sending..." : "Send Code"}
@@ -282,7 +286,7 @@ const Verify = () => {
                       Verify
                     </Button>
                   </div>
-                  {!user?.phone && (
+                  {!profile?.phone && (
                     <p className="text-sm text-destructive">
                       Phone number missing. Please sign up with phone.
                     </p>
