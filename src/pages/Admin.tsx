@@ -8,131 +8,87 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Shield, LogOut, CheckCircle, XCircle, Eye, DollarSign, Plus, Edit, Trash2, BookOpen, BarChart3, Loader2, PlayCircle, StopCircle } from "lucide-react";
+import { Users, Shield, Plus, Edit, Save, X, Clock, Coins, Calendar, Trash2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
-import type { User } from "@supabase/supabase-js";  
 import { format } from "date-fns";
 
-interface Profile {
+interface UserWithScores {
   id: string;
-  email: string | null;
-  phone: string | null;
+  email: string;
   full_name: string | null;
-  email_verified: boolean;
-  phone_verified: boolean;
   role: string;
   wallet_balance: number;
-  documents_verified: boolean;
-  created_at: string | null;
-}
-
-interface QuizQuestion {
-  id: string;
-  category: string;
-  question: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_answer: string;
-  explanation: string | null;
-  difficulty: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-interface KYCRequest {
-  id: string;
-  user_id: string;
-  document_type: string;
-  document_url: string;
-  status: string;
-  submitted_at: string;
-  reviewed_at: string | null;
-  reviewer_id: string | null;
-  notes: string | null;
-}
-
-interface WithdrawalRequest {
-  id: string;
-  user_id: string;
-  amount: number;
-  status: string;
-  requested_at: string;
-  processed_at: string | null;
-  payment_method: string;
-  account_details: string;
+  scores: {
+    quiz_id: string;
+    quiz_title: string;
+    score: number;
+    total_questions: number;
+    completed_at: string;
+  }[];
 }
 
 interface Quiz {
   id: string;
   title: string;
-  description: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  description: string;
+  time_limit_minutes: number;
+  entry_fee: number;
+  start_time: string;
+  end_time: string;
   total_questions: number;
-  created_at: string;
+  max_participants: number | null;
+  current_participants: number;
   created_by: string;
+  status: 'draft' | 'active' | 'completed';
+  created_at: string;
+  quiz_participants?: { count: number }[];
+  prize_first?: number;
+  prize_second?: number;
+  prize_third?: number;
+}
+
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: string;
+  wallet_balance: number;
 }
 
 interface UserQuizScore {
-  id: string;
-  user_id: string;
   quiz_id: string;
   score: number;
   total_questions: number;
-  correct_answers: number;
-  time_taken_seconds: number | null;
-  completed_at: string | null;
-  created_at: string;
-  profiles?: {
-    email: string | null;
-    full_name: string | null;
-  };
-  quizzes?: {
-    title: string;
-  };
+  completed_at: string;
+  quizzes?: { title: string } | null;
 }
 
 const Admin = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
-  const [kycRequests, setKycRequests] = useState<KYCRequest[]>([]);
-  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
+  const [users, setUsers] = useState<UserWithScores[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [scores, setScores] = useState<UserQuizScore[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [showCreateQuiz, setShowCreateQuiz] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [editingScore, setEditingScore] = useState<{ userId: string; quizId: string; newScore: string } | null>(null);
+  const [userRankings, setUserRankings] = useState<any[]>([]);
+  const [quizLeaderboard, setQuizLeaderboard] = useState<any[]>([]);
 
-  // Form state for adding/editing questions
-  const [questionForm, setQuestionForm] = useState({
-    category: '',
-    question: '',
-    option_a: '',
-    option_b: '',
-    option_c: '',
-    option_d: '',
-    correct_answer: '',
-    explanation: '',
-    difficulty: 'easy'
-  });
-
-  // Form state for creating quizzes
+  // Quiz form state
   const [quizForm, setQuizForm] = useState({
     title: '',
     description: '',
-    total_questions: 10,
-    status: 'draft' as const
+    time_limit_minutes: 15,
+    entry_fee: 0,
+    start_date: '',
+    end_date: '',
+    max_participants: null as number | null,
+    prize_first: 0,
+    prize_second: 0,
+    prize_third: 0,
+    questions: [{ question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: '' }]
   });
 
   useEffect(() => {
@@ -148,7 +104,6 @@ const Admin = () => {
         return;
       }
 
-      // Check if user is admin
       const { data: profileData } = await supabase
         .from("profiles")
         .select("role")
@@ -161,57 +116,8 @@ const Admin = () => {
         return;
       }
 
-      setUser(user);
-      setIsAdmin(true);
-
-      // Fetch all users
-      const { data: usersData, error: usersError } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (usersError) throw usersError;
-      setUsers(usersData || []);
-
-      // Fetch quiz questions
-      const { data: questionsData, error: questionsError } = await supabase
-        .from("quiz_questions")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (questionsError) throw questionsError;
-      setQuizQuestions(questionsData || []);
-
-      // Fetch quizzes
-      const { data: quizzesData, error: quizzesError } = await supabase
-        .from("quizzes")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!quizzesError) {
-        setQuizzes(quizzesData || []);
-      }
-
-      // Fetch quiz scores
-      const { data: scoresData, error: scoresError } = await supabase
-        .from("user_quiz_scores")
-        .select(`
-          *,
-          profiles(email, full_name),
-          quizzes(title)
-        `)
-        .order("completed_at", { ascending: false });
-
-      if (!scoresError) {
-        setScores(scoresData || []);
-      }
-
-      // Fetch KYC requests (we'll need to create this table)
-      // For now, we'll show empty state
-
-      // Fetch withdrawal requests (we'll need to create this table)
-      // For now, we'll show empty state
-
+      await fetchUsersWithScores();
+      await fetchQuizzes();
     } catch (error: any) {
       console.error("Error loading admin panel:", error);
       toast.error("Failed to load admin panel");
@@ -221,227 +127,355 @@ const Admin = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast.success("Logged out successfully");
-    navigate("/");
-  };
-
-  const handleAddQuestion = async () => {
+  const fetchUsersWithScores = async () => {
     try {
-      if (!questionForm.question || !questionForm.correct_answer) {
-        toast.error("Please fill in all required fields");
-        return;
+      // Fetch all users with their wallet balance
+      const { data: usersData } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!usersData) return;
+
+      // Fetch scores for each user
+      const usersWithScores: UserWithScores[] = [];
+
+      for (const user of usersData as Profile[]) {
+        const { data: scoresData } = await supabase
+          .from("user_quiz_scores")
+          .select(`
+            quiz_id,
+            score,
+            total_questions,
+            completed_at,
+            quizzes(title)
+          `)
+          .eq("user_id", user.id)
+          .order("completed_at", { ascending: false });
+
+        usersWithScores.push({
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name,
+          role: user.role,
+          wallet_balance: user.wallet_balance || 100,
+          scores: (scoresData as UserQuizScore[])?.map(score => ({
+            quiz_id: score.quiz_id,
+            quiz_title: score.quizzes?.title || 'Unknown Quiz',
+            score: score.score,
+            total_questions: score.total_questions,
+            completed_at: score.completed_at
+          })) || []
+        });
       }
 
-      const { error } = await supabase
-        .from("quiz_questions")
-        .insert([{
-          category: questionForm.category,
-          question: questionForm.question,
-          option_a: questionForm.option_a,
-          option_b: questionForm.option_b,
-          option_c: questionForm.option_c,
-          option_d: questionForm.option_d,
-          correct_answer: questionForm.correct_answer,
-          explanation: questionForm.explanation || null,
-          difficulty: questionForm.difficulty,
-          created_by: user?.id
-        }]);
-
-      if (error) throw error;
-
-      toast.success("Question added successfully");
-      setShowAddQuestion(false);
-      setQuestionForm({
-        category: '',
-        question: '',
-        option_a: '',
-        option_b: '',
-        option_c: '',
-        option_d: '',
-        correct_answer: '',
-        explanation: '',
-        difficulty: 'easy'
-      });
-
-      // Refresh questions
-      checkAdminAccess();
-    } catch (error: any) {
-      toast.error("Failed to add question");
-      console.error(error);
-    }
-  };
-
-  const handleToggleQuestionStatus = async (questionId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("quiz_questions")
-        .update({ is_active: !currentStatus })
-        .eq("id", questionId);
-
-      if (error) throw error;
-
-      toast.success(`Question ${!currentStatus ? 'activated' : 'deactivated'}`);
-      checkAdminAccess();
-    } catch (error: any) {
-      toast.error("Failed to update question status");
-    }
-  };
-
-  const handleDeleteQuestion = async (questionId: string) => {
-    try {
-      const { error } = await supabase
-        .from("quiz_questions")
-        .delete()
-        .eq("id", questionId);
-
-      if (error) throw error;
-
-      toast.success("Question deleted successfully");
-      checkAdminAccess();
-    } catch (error: any) {
-      toast.error("Failed to delete question");
-    }
-  };
-
-  const approveKYC = async (requestId: string) => {
-    try {
-      // KYC table not yet created - show placeholder functionality
-      toast.info("KYC functionality will be available once the database table is created");
-    } catch (error: any) {
-      toast.error("Failed to approve KYC request");
-    }
-  };
-
-  const rejectKYC = async (requestId: string) => {
-    try {
-      // KYC table not yet created - show placeholder functionality
-      toast.info("KYC functionality will be available once the database table is created");
-    } catch (error: any) {
-      toast.error("Failed to reject KYC request");
-    }
-  };
-
-  const processWithdrawal = async (requestId: string, action: "approve" | "reject") => {
-    try {
-      // Withdrawal table not yet created - show placeholder functionality
-      toast.info("Withdrawal functionality will be available once the database table is created");
-    } catch (error: any) {
-      toast.error(`Failed to ${action} withdrawal request`);
-    }
-  };
-
-  const getCategoryDisplayName = (category: string) => {
-    const categories: { [key: string]: string } = {
-      'general_knowledge': 'General Knowledge',
-      'science_tech': 'Science & Technology',
-      'entertainment': 'Entertainment',
-      'sports': 'Sports',
-      'history': 'History',
-      'geography': 'Geography',
-      'arts': 'Arts',
-      'business': 'Business'
-    };
-    return categories[category] || category;
-  };
-
-  const updateUserRole = async (userId: string, newRole: string) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole } as any)
-        .eq('id', userId);
-      
-      if (error) throw error;
-      
-      setUsers(users.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
-      ));
-      
-      toast.success(`User role updated to ${newRole}`);
+      setUsers(usersWithScores);
     } catch (error) {
-      console.error('Error updating user role:', error);
-      toast.error('Failed to update user role');
+      console.error("Error fetching users:", error);
+      toast.error("Failed to fetch users");
     }
   };
 
-  const createQuiz = async () => {
+  const fetchQuizzes = async () => {
     try {
-      if (!quizForm.title.trim()) {
-        toast.error('Please enter a quiz title');
-        return;
-      }
+      const { data: quizzesData } = await supabase
+        .from("quizzes")
+        .select(`
+          *,
+          quiz_participants(count)
+        `)
+        .order("created_at", { ascending: false });
 
-      const { data, error } = await supabase
-        .from('quizzes')
-        .insert([{
-          ...quizForm,
-          created_by: user?.id
-        }] as any)
-        .select()
-        .single();
+      // Transform the data to include current_participants count
+      const transformedQuizzes: Quiz[] = (quizzesData || []).map((quiz: any) => ({
+        ...quiz,
+        current_participants: (quiz.quiz_participants as { count: number }[])?.[0]?.count || 0
+      }));
 
-      if (error) throw error;
-
-      setQuizzes([data, ...quizzes]);
-      setQuizForm({
-        title: '',
-        description: '',
-        total_questions: 10,
-        status: 'draft'
-      });
-      setShowCreateQuiz(false);
-      
-      toast.success('Quiz created successfully');
+      setQuizzes(transformedQuizzes);
     } catch (error) {
-      console.error('Error creating quiz:', error);
-      toast.error('Failed to create quiz');
-    }
-  };
-
-  const updateQuizStatus = async (quizId: string, newStatus: Quiz['status']) => {
-    try {
-      const updateData: any = { status: newStatus };
-      
-      if (newStatus === 'active') {
-        updateData.start_time = new Date().toISOString();
-      } else if (newStatus === 'completed') {
-        updateData.end_time = new Date().toISOString();
-      }
-
-      const { error } = await supabase
-        .from('quizzes')
-        .update(updateData as any)
-        .eq('id', quizId);
-      
-      if (error) throw error;
-      
-      setQuizzes(quizzes.map(quiz => 
-        quiz.id === quizId ? { ...quiz, ...updateData } : quiz
-      ));
-      
-      toast.success(`Quiz ${newStatus === 'active' ? 'started' : 'ended'} successfully`);
-    } catch (error) {
-      console.error('Error updating quiz status:', error);
-      toast.error('Failed to update quiz status');
+      console.error("Error fetching quizzes:", error);
     }
   };
 
   const deleteQuiz = async (quizId: string) => {
     try {
-      const { error } = await supabase
-        .from('quizzes')
+      // First, delete all questions associated with this quiz
+      const { error: questionsError } = await supabase
+        .from("quiz_questions")
         .delete()
-        .eq('id', quizId);
-      
-      if (error) throw error;
-      
-      setQuizzes(quizzes.filter(q => q.id !== quizId));
-      toast.success('Quiz deleted successfully');
+        .eq("quiz_id", quizId);
+
+      if (questionsError) {
+        console.error("Error deleting quiz questions:", questionsError);
+        toast.error("Failed to delete quiz questions");
+        return;
+      }
+
+      // Delete the quiz itself
+      const { error: quizError } = await supabase
+        .from("quizzes")
+        .delete()
+        .eq("id", quizId);
+
+      if (quizError) {
+        console.error("Error deleting quiz:", quizError);
+        toast.error("Failed to delete quiz");
+        return;
+      }
+
+      toast.success("Quiz deleted successfully");
+      await fetchQuizzes(); // Refresh the quiz list
     } catch (error) {
-      console.error('Error deleting quiz:', error);
-      toast.error('Failed to delete quiz');
+      console.error("Error deleting quiz:", error);
+      toast.error("Failed to delete quiz");
+    }
+  };
+
+  const addQuestion = () => {
+    setQuizForm({
+      ...quizForm,
+      questions: [...quizForm.questions, { question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: '' }]
+    });
+  };
+
+  const updateQuestion = (index: number, field: string, value: string) => {
+    const updatedQuestions = [...quizForm.questions];
+    updatedQuestions[index] = { ...updatedQuestions[index], [field]: value };
+    setQuizForm({ ...quizForm, questions: updatedQuestions });
+  };
+
+  const removeQuestion = (index: number) => {
+    const updatedQuestions = quizForm.questions.filter((_, i) => i !== index);
+    setQuizForm({ ...quizForm, questions: updatedQuestions });
+  };
+
+  const createQuiz = async () => {
+    try {
+      console.log("Starting quiz creation...");
+
+      if (!quizForm.title.trim()) {
+        toast.error("Please enter a quiz title");
+        return;
+      }
+
+      if (quizForm.questions.length === 0) {
+        toast.error("Please add at least one question");
+        return;
+      }
+
+      if (!quizForm.start_date || !quizForm.end_date) {
+        toast.error("Please set start and end dates");
+        return;
+      }
+
+      // Validate that end date is after start date
+      if (new Date(quizForm.end_date) <= new Date(quizForm.start_date)) {
+        toast.error("End date must be after start date");
+        return;
+      }
+
+      // Validate questions have content
+      for (let i = 0; i < quizForm.questions.length; i++) {
+        const q = quizForm.questions[i];
+        if (!q.question.trim() || !q.option_a.trim() || !q.option_b.trim() ||
+            !q.option_c.trim() || !q.option_d.trim() || !q.correct_answer.trim()) {
+          toast.error(`Please fill in all fields for Question ${i + 1}`);
+          return;
+        }
+      }
+
+      console.log("Validation passed, creating user auth check...");
+
+      // Create the quiz
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("User auth data:", user);
+
+      if (!user) {
+        toast.error("User not authenticated");
+        return;
+      }
+
+      // Check if user is admin
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      console.log("User profile:", profileData);
+
+      if (!profileData || (profileData as any).role !== 'admin') {
+        toast.error("Admin privileges required");
+        return;
+      }
+
+      console.log("Creating quiz with data:", {
+        title: quizForm.title,
+        description: quizForm.description,
+        time_limit_minutes: quizForm.time_limit_minutes,
+        entry_fee: quizForm.entry_fee,
+        start_time: quizForm.start_date,
+        end_time: quizForm.end_date,
+        total_questions: quizForm.questions.length,
+        max_participants: quizForm.max_participants,
+        created_by: user.id,
+        status: 'active'
+      });
+
+      const { data: quizData, error: quizError } = await supabase
+        .from("quizzes")
+        // @ts-ignore - Supabase client typing issue
+        .insert([{
+          title: quizForm.title,
+          description: quizForm.description,
+          time_limit_minutes: quizForm.time_limit_minutes,
+          entry_fee: quizForm.entry_fee,
+          start_time: quizForm.start_date,
+          end_time: quizForm.end_date,
+          total_questions: quizForm.questions.length,
+          max_participants: quizForm.max_participants,
+          current_participants: 0,
+          created_by: user.id,
+          status: 'active',
+          prize_first: quizForm.prize_first,
+          prize_second: quizForm.prize_second,
+          prize_third: quizForm.prize_third
+        }])
+        .select()
+        .single();
+
+      if (quizError) {
+        console.error("Quiz creation error:", quizError);
+        throw quizError;
+      }
+
+      if (!quizData) {
+        throw new Error("Failed to create quiz - no data returned");
+      }
+
+      const quizId = quizData?.id || '';
+      if (!quizId) {
+        throw new Error("Quiz ID not found in response");
+      }
+
+      console.log("Quiz created successfully:", quizData);
+
+      // Add questions to quiz_questions table
+      if (quizForm.questions.length > 0) {
+        console.log("Adding questions...");
+        const questionsData = quizForm.questions.map(q => ({
+          quiz_id: quizId,
+          category: 'general_knowledge',
+          question: q.question,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_answer: q.correct_answer,
+          is_active: true
+        }));
+
+        console.log("Questions data:", questionsData);
+
+        const { error: questionsError } = await supabase
+          .from("quiz_questions")
+          // @ts-ignore - Supabase client typing issue
+          .insert(questionsData);
+
+        if (questionsError) {
+          console.error("Questions creation error:", questionsError);
+          throw questionsError;
+        }
+
+        console.log("Questions added successfully");
+      }
+
+      toast.success("Quiz created successfully");
+      setShowCreateQuiz(false);
+      setQuizForm({
+        title: '',
+        description: '',
+        time_limit_minutes: 15,
+        entry_fee: 0,
+        start_date: '',
+        end_date: '',
+        max_participants: null,
+        prize_first: 0,
+        prize_second: 0,
+        prize_third: 0,
+        questions: [{ question: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: '' }]
+      });
+
+      await fetchQuizzes();
+    } catch (error: any) {
+      console.error("Error creating quiz:", error);
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      toast.error(`Failed to create quiz: ${error.message || 'Unknown error'}`);
+    }
+  };
+  const fetchLeaderboardData = async () => {
+    try {
+      // Fetch quiz-specific leaderboard
+      const { data: quizData } = await supabase
+        .from("quiz_leaderboard")
+        .select(`
+          *,
+          quizzes(title),
+          profiles(full_name, email)
+        `)
+        .order("percentage", { ascending: false })
+        .order("completed_at", { ascending: true });
+
+      if (quizData) {
+        setQuizLeaderboard(quizData);
+      }
+
+      // Fetch overall user rankings
+      const { data: userData } = await supabase
+        .from("user_rankings")
+        .select(`
+          *,
+          profiles(full_name, email)
+        `)
+        .order("average_score", { ascending: false })
+        .order("quizzes_completed", { ascending: false });
+
+      if (userData) {
+        setUserRankings(userData);
+      }
+    } catch (error) {
+      console.error("Error fetching leaderboard data:", error);
+      toast.error("Failed to load leaderboard");
+    }
+  };
+
+  const updateUserScore = async (userId: string, quizId: string, newScore: number) => {
+    try {
+      const { error } = await supabase
+        .from("user_quiz_scores")
+        // @ts-ignore - Supabase typing issue with update operations
+        .update({ score: newScore })
+        .eq("user_id", userId)
+        .eq("quiz_id", quizId);
+
+      if (error) {
+        console.error("Error updating score:", error);
+        toast.error("Failed to update score");
+        return;
+      }
+
+      toast.success("Score updated successfully");
+      setEditingScore(null);
+      await fetchUsersWithScores(); // Refresh the users list
+    } catch (error) {
+      console.error("Error updating score:", error);
+      toast.error("Failed to update score");
     }
   };
 
@@ -456,207 +490,419 @@ const Admin = () => {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Shield className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
-              You don't have permission to access the admin panel.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate("/dashboard")} className="w-full">
-              Go to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
       <div className="container mx-auto px-4 py-8 pt-20">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
-          <p className="text-xl text-muted-foreground">Manage users, quiz questions, KYC requests, and withdrawals</p>
+          <p className="text-xl text-muted-foreground">Manage users, scores, and create quizzes</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
-                  <p className="text-3xl font-bold">{users.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-500/10 rounded-full">
-                  <CheckCircle className="h-6 w-6 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Verified Users</p>
-                  <p className="text-3xl font-bold">
-                    {users?.filter(u => u.email_verified && u.phone_verified).length || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-500/10 rounded-full">
-                  <BookOpen className="h-6 w-6 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Quiz Questions</p>
-                  <p className="text-3xl font-bold">{quizQuestions.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-yellow-500/10 rounded-full">
-                  <Eye className="h-6 w-6 text-yellow-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending KYC</p>
-                  <p className="text-3xl font-bold">{kycRequests?.filter(k => k.status === "pending").length || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-primary transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-500/10 rounded-full">
-                  <DollarSign className="h-6 w-6 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Withdrawals</p>
-                  <p className="text-3xl font-bold">{withdrawalRequests?.filter(w => w.status === "pending").length || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Admin Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
-            <TabsTrigger value="scores">Scores</TabsTrigger>
-            <TabsTrigger value="questions">Questions</TabsTrigger>
-            <TabsTrigger value="kyc">KYC</TabsTrigger>
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="users">Users & Scores</TabsTrigger>
+            <TabsTrigger value="quizzes">Create Quizzes</TabsTrigger>
+            <TabsTrigger value="manage-quizzes">Manage Quizzes</TabsTrigger>
+            <TabsTrigger value="quiz-results">Quiz Results</TabsTrigger>
+            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{users.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {users.filter(u => u.role === 'admin').length} admins
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Quizzes</CardTitle>
-                  <BookOpen className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {quizzes.filter(q => q.status === 'active').length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {quizzes.length} total quizzes
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Quiz Attempts</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{scores.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {scores.filter(s => s.completed_at).length} completed
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg. Score</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {scores.length > 0 
-                      ? (scores.reduce((sum, score) => sum + (score.score / score.total_questions * 100), 0) / scores.length).toFixed(1) + '%'
-                      : 'N/A'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    across all quizzes
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="mt-6">
+          <TabsContent value="users">
+            <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest quiz attempts</CardDescription>
+                <CardTitle>All Users & Scores</CardTitle>
+                <CardDescription>View and modify user quiz scores</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {users.map((user) => (
+                    <div key={user.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{user.full_name || user.email}</h3>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                            {user.role}
+                          </Badge>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">
+                            Wallet: <span className="font-semibold text-green-600">{user.wallet_balance} coins</span>
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {user.scores.length} quiz attempts
+                          </p>
+                          <p className="text-sm font-medium">
+                            Avg Score: {user.scores.length > 0
+                              ? (user.scores.reduce((sum, score) =>
+                                  sum + (score.score / score.total_questions * 100), 0) / user.scores.length).toFixed(1) + '%'
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {user.scores.length > 0 ? (
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Quiz Scores:</h4>
+                          {user.scores.map((score, index) => (
+                            <div key={index} className="flex items-center justify-between bg-muted p-3 rounded">
+                              <div>
+                                <p className="font-medium">{score.quiz_title}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Completed: {format(new Date(score.completed_at), 'MMM d, yyyy h:mm a')}
+                                </p>
+                              </div>
+                              {editingScore?.userId === user.id && editingScore?.quizId === score.quiz_id ? (
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max={score.total_questions}
+                                    value={editingScore.newScore}
+                                    onChange={(e) => setEditingScore({
+                                      ...editingScore,
+                                      newScore: e.target.value
+                                    })}
+                                    className="w-20"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() => updateUserScore(user.id, score.quiz_id, parseInt(editingScore.newScore))}
+                                  >
+                                    <Save className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingScore(null)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold">
+                                    {score.score}/{score.total_questions}
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingScore({
+                                      userId: user.id,
+                                      quizId: score.quiz_id,
+                                      newScore: score.score.toString()
+                                    })}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground">No quiz attempts yet</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="quizzes">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create New Quiz</CardTitle>
+                <CardDescription>Set up quizzes with questions, time limits, and pricing</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Dialog open={showCreateQuiz} onOpenChange={setShowCreateQuiz}>
+                  <DialogTrigger asChild>
+                    <Button className="mb-4">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Quiz
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Create New Quiz</DialogTitle>
+                      <DialogDescription>
+                        Fill in the quiz details and add questions
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6">
+                      {/* Quiz Details */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="quiz-title">Quiz Title</Label>
+                          <Input
+                            id="quiz-title"
+                            placeholder="Enter quiz title"
+                            value={quizForm.title}
+                            onChange={(e) => setQuizForm({...quizForm, title: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="time-limit">Time Limit (minutes)</Label>
+                          <Input
+                            id="time-limit"
+                            type="number"
+                            min="1"
+                            value={quizForm.time_limit_minutes}
+                            onChange={(e) => setQuizForm({...quizForm, time_limit_minutes: parseInt(e.target.value) || 15})}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="quiz-description">Description</Label>
+                        <Textarea
+                          id="quiz-description"
+                          placeholder="Enter quiz description"
+                          rows={3}
+                          value={quizForm.description}
+                          onChange={(e) => setQuizForm({...quizForm, description: e.target.value})}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="entry-fee">Entry Fee (Coins)</Label>
+                          <Input
+                            id="entry-fee"
+                            type="number"
+                            min="0"
+                            value={quizForm.entry_fee}
+                            onChange={(e) => setQuizForm({...quizForm, entry_fee: parseInt(e.target.value) || 0})}
+                          />
+                          <p className="text-xs text-muted-foreground">Set to 0 for free quiz</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="prize-first">1st Prize (Coins)</Label>
+                          <Input
+                            id="prize-first"
+                            type="number"
+                            min="0"
+                            value={quizForm.prize_first}
+                            onChange={(e) => setQuizForm({...quizForm, prize_first: parseInt(e.target.value) || 0})}
+                          />
+                          <p className="text-xs text-muted-foreground">Prize for 1st place</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="prize-second">2nd Prize (Coins)</Label>
+                          <Input
+                            id="prize-second"
+                            type="number"
+                            min="0"
+                            value={quizForm.prize_second}
+                            onChange={(e) => setQuizForm({...quizForm, prize_second: parseInt(e.target.value) || 0})}
+                          />
+                          <p className="text-xs text-muted-foreground">Prize for 2nd place</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="prize-third">3rd Prize (Coins)</Label>
+                          <Input
+                            id="prize-third"
+                            type="number"
+                            min="0"
+                            value={quizForm.prize_third}
+                            onChange={(e) => setQuizForm({...quizForm, prize_third: parseInt(e.target.value) || 0})}
+                          />
+                          <p className="text-xs text-muted-foreground">Prize for 3rd place</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="max-participants">Max Participants</Label>
+                          <Input
+                            id="max-participants"
+                            type="number"
+                            min="1"
+                            placeholder="Unlimited"
+                            value={quizForm.max_participants || ''}
+                            onChange={(e) => setQuizForm({...quizForm, max_participants: e.target.value ? parseInt(e.target.value) : null})}
+                          />
+                          <p className="text-xs text-muted-foreground">Leave empty for unlimited</p>
+                        </div>
+                      </div>
+
+                      {/* Questions */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold">Questions</h3>
+                          <Button variant="outline" onClick={addQuestion}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Question
+                          </Button>
+                        </div>
+
+                        {quizForm.questions.map((question, index) => (
+                          <Card key={index} className="p-4">
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium">Question {index + 1}</h4>
+                                {quizForm.questions.length > 1 && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeQuestion(index)}
+                                  >
+                                    Remove
+                                  </Button>
+                                )}
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label>Question</Label>
+                                <Textarea
+                                  placeholder="Enter your question"
+                                  value={question.question}
+                                  onChange={(e) => updateQuestion(index, 'question', e.target.value)}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Option A</Label>
+                                  <Input
+                                    placeholder="Option A"
+                                    value={question.option_a}
+                                    onChange={(e) => updateQuestion(index, 'option_a', e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Option B</Label>
+                                  <Input
+                                    placeholder="Option B"
+                                    value={question.option_b}
+                                    onChange={(e) => updateQuestion(index, 'option_b', e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Option C</Label>
+                                  <Input
+                                    placeholder="Option C"
+                                    value={question.option_c}
+                                    onChange={(e) => updateQuestion(index, 'option_c', e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Option D</Label>
+                                  <Input
+                                    placeholder="Option D"
+                                    value={question.option_d}
+                                    onChange={(e) => updateQuestion(index, 'option_d', e.target.value)}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label>Correct Answer (A, B, C, or D)</Label>
+                                <Input
+                                  placeholder="Enter A, B, C, or D"
+                                  value={question.correct_answer}
+                                  onChange={(e) => updateQuestion(index, 'correct_answer', e.target.value.toUpperCase())}
+                                  maxLength={1}
+                                />
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button onClick={createQuiz}>Create Quiz</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="manage-quizzes">
+            <Card>
+              <CardHeader>
+                <CardTitle>Manage Existing Quizzes</CardTitle>
+                <CardDescription>View and manage all quizzes</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {scores.slice(0, 5).map((score) => (
-                    <div key={score.id} className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {score.profiles?.full_name || score.profiles?.email || 'Unknown user'} completed a quiz
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Scored {score.score}/{score.total_questions} ({((score.score / score.total_questions) * 100).toFixed(1)}%)
-                        </p>
+                  {quizzes.map((quiz) => (
+                    <div key={quiz.id} className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold">{quiz.title}</h3>
+                          <p className="text-muted-foreground mt-1">{quiz.description}</p>
+                          <div className="flex items-center gap-4 mt-3 text-sm">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{quiz.time_limit_minutes} min</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Coins className="h-4 w-4" />
+                              <span>{quiz.entry_fee === 0 ? 'Free' : `${quiz.entry_fee} Coins`}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Users className="h-4 w-4" />
+                              <span>{quiz.current_participants}/{quiz.max_participants || '∞'}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              <span>{format(new Date(quiz.created_at), 'MMM d, yyyy')}</span>
+                            </div>
+                          </div>
+                          {/* Prize Information */}
+                          {(quiz.prize_first || quiz.prize_second || quiz.prize_third) && (
+                            <div className="mt-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Trophy className="h-4 w-4 text-yellow-600" />
+                                <span className="text-sm font-medium text-yellow-800">Prizes</span>
+                              </div>
+                              <div className="flex gap-4 text-xs">
+                                {quiz.prize_first > 0 && (
+                                  <div className="text-center">
+                                    <div className="font-bold text-yellow-700">🥇 {quiz.prize_first}</div>
+                                    <div className="text-yellow-600">1st Place</div>
+                                  </div>
+                                )}
+                                {quiz.prize_second > 0 && (
+                                  <div className="text-center">
+                                    <div className="font-bold text-yellow-700">🥈 {quiz.prize_second}</div>
+                                    <div className="text-yellow-600">2nd Place</div>
+                                  </div>
+                                )}
+                                {quiz.prize_third > 0 && (
+                                  <div className="text-center">
+                                    <div className="font-bold text-yellow-700">🥉 {quiz.prize_third}</div>
+                                    <div className="text-yellow-600">3rd Place</div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteQuiz(quiz.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {score.completed_at ? format(new Date(score.completed_at), 'MMM d, yyyy h:mm a') : 'In progress'}
-                      </p>
                     </div>
                   ))}
-                  {scores.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No recent activity to display
+                  {quizzes.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No quizzes created yet. Create your first quiz above!
                     </p>
                   )}
                 </div>
@@ -664,510 +910,74 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="users">
+          <TabsContent value="quiz-results">
             <Card>
               <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>
-                  View and manage user accounts and permissions
-                </CardDescription>
+                <CardTitle>Quiz Results & Rankings</CardTitle>
+                <CardDescription>View and modify quiz results and prize distributions</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Joined</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.length > 0 ? (
-                        users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium">
-                              {user.full_name || 'No name'}
-                            </TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>
-                              <Select
-                                value={user.role || 'user'}
-                                onValueChange={(value) => updateUserRole(user.id, value)}
-                              >
-                                <SelectTrigger className="w-[120px]">
-                                  <SelectValue placeholder="Select role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="admin">Admin</SelectItem>
-                                  <SelectItem value="user">User</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  user.email_verified && user.phone_verified
-                                    ? 'default'
-                                    : 'secondary'
-                                }
-                              >
-                                {user.email_verified && user.phone_verified
-                                  ? 'Verified'
-                                  : 'Pending'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {user.created_at
-                                ? format(new Date(user.created_at), 'MMM d, yyyy')
-                                : 'N/A'}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            No users found
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="quizzes">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="text-2xl font-bold">Quiz Management</h2>
-                <p className="text-muted-foreground">
-                  Create and manage quizzes
-                </p>
-              </div>
-              <Dialog open={showCreateQuiz} onOpenChange={setShowCreateQuiz}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Quiz
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create New Quiz</DialogTitle>
-                    <DialogDescription>
-                      Fill in the details to create a new quiz
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="quiz-title">Title</Label>
-                      <Input 
-                        id="quiz-title" 
-                        placeholder="Enter quiz title" 
-                        value={quizForm.title}
-                        onChange={(e) => setQuizForm({...quizForm, title: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="quiz-description">Description</Label>
-                      <Textarea
-                        id="quiz-description"
-                        placeholder="Enter quiz description"
-                        rows={3}
-                        value={quizForm.description}
-                        onChange={(e) => setQuizForm({...quizForm, description: e.target.value})}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="total-questions">Total Questions</Label>
-                        <Input
-                          id="total-questions"
-                          type="number"
-                          min="1"
-                          value={quizForm.total_questions}
-                          onChange={(e) => setQuizForm({...quizForm, total_questions: parseInt(e.target.value) || 10})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="quiz-status">Status</Label>
-                        <Select 
-                          value={quizForm.status}
-                          onValueChange={(value: 'draft' | 'active') => 
-                            setQuizForm({...quizForm, status: value})
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={createQuiz}>Create Quiz</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <Card>
-              <CardContent className="pt-6">
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Questions</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {quizzes.length > 0 ? (
-                        quizzes.map((quiz) => (
-                          <TableRow key={quiz.id}>
-                            <TableCell className="font-medium">
-                              {quiz.title}
-                              <p className="text-sm text-muted-foreground">
-                                {quiz.description || 'No description'}
-                              </p>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  quiz.status === 'active'
-                                    ? 'default'
-                                    : quiz.status === 'completed'
-                                    ? 'secondary'
-                                    : 'outline'
-                                }
-                              >
-                                {quiz.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{quiz.total_questions}</TableCell>
-                            <TableCell>
+                <div className="space-y-6">
+                  {quizzes.map((quiz) => (
+                    <div key={quiz.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{quiz.title}</h3>
+                          <p className="text-sm text-muted-foreground">{quiz.description}</p>
+                          <div className="flex items-center gap-4 mt-2 text-sm">
+                            <Badge variant={quiz.status === 'active' ? 'default' : 'secondary'}>
+                              {quiz.status}
+                            </Badge>
+                            <span className="text-muted-foreground">
                               {format(new Date(quiz.created_at), 'MMM d, yyyy')}
-                            </TableCell>
-                            <TableCell className="text-right space-x-2">
-                              {quiz.status === 'draft' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => updateQuizStatus(quiz.id, 'active')}
-                                >
-                                  <PlayCircle className="h-4 w-4 mr-1" />
-                                  Start
-                                </Button>
-                              )}
-                              {quiz.status === 'active' && (
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => updateQuizStatus(quiz.id, 'completed')}
-                                >
-                                  <StopCircle className="h-4 w-4 mr-1" />
-                                  End
-                                </Button>
-                              )}
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => deleteQuiz(quiz.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell
-                            colSpan={5}
-                            className="text-center py-8 text-muted-foreground"
-                          >
-                            No quizzes found. Create your first quiz to get started.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="scores">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quiz Results</CardTitle>
-                <CardDescription>
-                  View and analyze quiz scores and performance
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead>Quiz</TableHead>
-                        <TableHead>Score</TableHead>
-                        <TableHead>Correct</TableHead>
-                        <TableHead>Time Taken</TableHead>
-                        <TableHead>Completed At</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {scores.length > 0 ? (
-                        scores.map((score) => (
-                          <TableRow key={score.id}>
-                            <TableCell className="font-medium">
-                              {score.profiles?.full_name || score.profiles?.email || 'Unknown user'}
-                            </TableCell>
-                            <TableCell>{score.quizzes?.title || 'Unknown quiz'}</TableCell>
-                            <TableCell>
-                              <Badge variant={score.score / score.total_questions >= 0.7 ? 'default' : 'secondary'}>
-                                {score.score}/{score.total_questions} (
-                                {((score.score / score.total_questions) * 100).toFixed(1)}%)
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{score.correct_answers}</TableCell>
-                            <TableCell>
-                              {score.time_taken_seconds
-                                ? `${Math.floor(score.time_taken_seconds / 60)}m ${score.time_taken_seconds % 60}s`
-                                : 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              {score.completed_at
-                                ? format(new Date(score.completed_at), 'MMM d, yyyy h:mm a')
-                                : 'In progress'}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell
-                            colSpan={6}
-                            className="text-center py-8 text-muted-foreground"
-                          >
-                            No quiz results available yet.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="questions">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Quiz Questions Management</CardTitle>
-                  <CardDescription>Add, edit, and manage quiz questions</CardDescription>
-                </div>
-                <Dialog open={showAddQuestion} onOpenChange={setShowAddQuestion}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Question
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Add New Question</DialogTitle>
-                      <DialogDescription>
-                        Create a new quiz question with multiple choice options.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="category">Category</Label>
-                        <Select value={questionForm.category} onValueChange={(value) => setQuestionForm({...questionForm, category: value})}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="general_knowledge">General Knowledge</SelectItem>
-                            <SelectItem value="science_tech">Science & Technology</SelectItem>
-                            <SelectItem value="entertainment">Entertainment</SelectItem>
-                            <SelectItem value="sports">Sports</SelectItem>
-                            <SelectItem value="history">History</SelectItem>
-                            <SelectItem value="geography">Geography</SelectItem>
-                            <SelectItem value="arts">Arts</SelectItem>
-                            <SelectItem value="business">Business</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="question">Question</Label>
-                        <Textarea
-                          id="question"
-                          value={questionForm.question}
-                          onChange={(e) => setQuestionForm({...questionForm, question: e.target.value})}
-                          placeholder="Enter the question"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="option_a">Option A</Label>
-                          <Input
-                            id="option_a"
-                            value={questionForm.option_a}
-                            onChange={(e) => setQuestionForm({...questionForm, option_a: e.target.value})}
-                            placeholder="Option A"
-                          />
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor="option_b">Option B</Label>
-                          <Input
-                            id="option_b"
-                            value={questionForm.option_b}
-                            onChange={(e) => setQuestionForm({...questionForm, option_b: e.target.value})}
-                            placeholder="Option B"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="option_c">Option C</Label>
-                          <Input
-                            id="option_c"
-                            value={questionForm.option_c}
-                            onChange={(e) => setQuestionForm({...questionForm, option_c: e.target.value})}
-                            placeholder="Option C"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="option_d">Option D</Label>
-                          <Input
-                            id="option_d"
-                            value={questionForm.option_d}
-                            onChange={(e) => setQuestionForm({...questionForm, option_d: e.target.value})}
-                            placeholder="Option D"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="correct_answer">Correct Answer</Label>
-                        <Select value={questionForm.correct_answer} onValueChange={(value) => setQuestionForm({...questionForm, correct_answer: value})}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select correct answer" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="A">A - {questionForm.option_a || 'Option A'}</SelectItem>
-                            <SelectItem value="B">B - {questionForm.option_b || 'Option B'}</SelectItem>
-                            <SelectItem value="C">C - {questionForm.option_c || 'Option C'}</SelectItem>
-                            <SelectItem value="D">D - {questionForm.option_d || 'Option D'}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="explanation">Explanation (Optional)</Label>
-                        <Textarea
-                          id="explanation"
-                          value={questionForm.explanation}
-                          onChange={(e) => setQuestionForm({...questionForm, explanation: e.target.value})}
-                          placeholder="Explain why this is the correct answer"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="difficulty">Difficulty</Label>
-                        <Select value={questionForm.difficulty} onValueChange={(value) => setQuestionForm({...questionForm, difficulty: value})}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="easy">Easy</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="hard">Hard</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex gap-2 pt-4">
-                        <Button onClick={handleAddQuestion} className="flex-1">
-                          Add Question
-                        </Button>
-                        <Button variant="outline" onClick={() => setShowAddQuestion(false)}>
-                          Cancel
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {/* TODO: Show quiz results modal */}}
+                        >
+                          View Results
                         </Button>
                       </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {quizQuestions.map((question) => (
-                    <div key={question.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
+
+                      {/* Prize Information */}
+                      {(quiz.prize_first || quiz.prize_second || quiz.prize_third) && (
+                        <div className="mb-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
                           <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="outline">{getCategoryDisplayName(question.category)}</Badge>
-                            <Badge variant={question.difficulty === 'easy' ? 'default' : question.difficulty === 'medium' ? 'secondary' : 'destructive'}>
-                              {question.difficulty}
-                            </Badge>
-                            <Badge variant={question.is_active ? 'default' : 'secondary'}>
-                              {question.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
+                            <Trophy className="h-4 w-4 text-yellow-600" />
+                            <span className="text-sm font-medium text-yellow-800">Prize Pool</span>
                           </div>
-                          <h3 className="font-semibold mb-2">{question.question}</h3>
-                          <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-                            <div>A: {question.option_a}</div>
-                            <div>B: {question.option_b}</div>
-                            <div>C: {question.option_c}</div>
-                            <div>D: {question.option_d}</div>
+                          <div className="flex gap-4 text-sm">
+                            {quiz.prize_first > 0 && (
+                              <div className="text-center">
+                                <div className="font-bold text-yellow-700">🥇 {quiz.prize_first} coins</div>
+                                <div className="text-yellow-600">1st Place</div>
+                              </div>
+                            )}
+                            {quiz.prize_second > 0 && (
+                              <div className="text-center">
+                                <div className="font-bold text-yellow-700">🥈 {quiz.prize_second} coins</div>
+                                <div className="text-yellow-600">2nd Place</div>
+                              </div>
+                            )}
                           </div>
-                          <div className="text-sm text-green-600 font-medium">
-                            Correct Answer: {question.correct_answer}
-                          </div>
-                          {question.explanation && (
-                            <p className="text-sm text-muted-foreground mt-2 italic">
-                              {question.explanation}
-                            </p>
-                          )}
                         </div>
-                        <div className="flex gap-2 ml-4">
-                          <Button
-                            size="sm"
-                            variant={question.is_active ? "destructive" : "default"}
-                            onClick={() => handleToggleQuestionStatus(question.id, question.is_active)}
-                          >
-                            {question.is_active ? 'Deactivate' : 'Activate'}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleDeleteQuestion(question.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      )}
+
+                      <div className="text-sm text-muted-foreground">
+                        Total Prize Pool: <span className="font-semibold text-green-600">
+                          {(quiz.prize_first || 0) + (quiz.prize_second || 0) + (quiz.prize_third || 0)} coins
+                        </span>
                       </div>
                     </div>
                   ))}
-                  {quizQuestions.length === 0 && (
-                    <div className="text-center py-12">
-                      <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">No Questions Yet</h3>
-                      <p className="text-muted-foreground mb-4">Start by adding your first quiz question.</p>
-                      <Button onClick={() => setShowAddQuestion(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add First Question
-                      </Button>
+
+                  {quizzes.length === 0 && (
+                    <div className="text-center py-8">
+                      <Trophy className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No quizzes with results yet</p>
                     </div>
                   )}
                 </div>
@@ -1175,139 +985,134 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="users">
+          <TabsContent value="leaderboard">
             <Card>
               <CardHeader>
-                <CardTitle>Registered Users</CardTitle>
-                <CardDescription>View all registered users and their verification status</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Leaderboard Management
+                </CardTitle>
+                <CardDescription>View and manage quiz leaderboards and rankings</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h3 className="font-semibold">{user.full_name || "Unnamed User"}</h3>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-sm text-muted-foreground">{user.phone}</p>
+                <div className="space-y-6">
+                  <div className="flex gap-4 mb-6">
+                    <Button onClick={() => navigate("/leaderboard")}>
+                      <Trophy className="h-4 w-4 mr-2" />
+                      View Public Leaderboard
+                    </Button>
+                    <Button variant="outline" onClick={fetchLeaderboardData}>
+                      Refresh Data
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Top Quiz Performers</CardTitle>
+                        <CardDescription>Users with highest average scores</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {userRankings.length === 0 ? (
+                            <p className="text-muted-foreground text-center py-4">No rankings available yet</p>
+                          ) : (
+                            userRankings.slice(0, 10).map((user, index) => (
+                              <div key={user.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                    index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                                    index === 1 ? 'bg-gray-100 text-gray-800' :
+                                    index === 2 ? 'bg-amber-100 text-amber-800' :
+                                    'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {index + 1}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">
+                                      {user.profiles?.full_name || user.profiles?.email || 'Anonymous'}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {user.quizzes_completed} quizzes
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold">{user.average_score.toFixed(1)}%</div>
+                                  <div className="text-sm text-muted-foreground">Avg Score</div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Recent Quiz Results</CardTitle>
+                        <CardDescription>Latest completed quizzes</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {quizLeaderboard.length === 0 ? (
+                            <p className="text-muted-foreground text-center py-4">No quiz results yet</p>
+                          ) : (
+                            quizLeaderboard.slice(0, 10).map((entry) => (
+                              <div key={entry.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                <div className="flex-1">
+                                  <p className="font-medium">{entry.quizzes?.title || 'Unknown Quiz'}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {entry.profiles?.full_name || entry.profiles?.email || 'Anonymous'}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold">{entry.percentage.toFixed(1)}%</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {entry.score}/{entry.total_questions}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Leaderboard Statistics</CardTitle>
+                      <CardDescription>Overview of quiz performance</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-primary">{userRankings.length}</div>
+                          <div className="text-sm text-muted-foreground">Total Players</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {quizLeaderboard.reduce((sum, entry) => sum + entry.total_questions, 0)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Questions Answered</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {Math.round(quizLeaderboard.reduce((sum, entry) => sum + entry.percentage, 0) / Math.max(quizLeaderboard.length, 1))}%
+                          </div>
+                          <div className="text-sm text-muted-foreground">Average Score</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {new Set(quizLeaderboard.map(entry => entry.quiz_id)).size}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Active Quizzes</div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Badge variant={user.email_verified ? "default" : "secondary"}>
-                          {user.email_verified ? "Email Verified" : "Email Pending"}
-                        </Badge>
-                        <Badge variant={user.phone_verified ? "default" : "secondary"}>
-                          {user.phone_verified ? "Phone Verified" : "Phone Pending"}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="kyc">
-            <Card>
-              <CardHeader>
-                <CardTitle>KYC Requests</CardTitle>
-                <CardDescription>Review and approve user KYC submissions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {kycRequests.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Eye className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No KYC Requests</h3>
-                    <p className="text-muted-foreground">KYC requests will appear here when users submit them.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {kycRequests.map((request) => (
-                      <div key={request.id} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h3 className="font-semibold">KYC Request #{request.id.slice(0, 8)}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Submitted: {new Date(request.submitted_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Badge variant={request.status === "pending" ? "secondary" : request.status === "approved" ? "default" : "destructive"}>
-                            {request.status}
-                          </Badge>
-                        </div>
-                        <p className="text-sm mb-4">Document Type: {request.document_type}</p>
-                        {request.status === "pending" && (
-                          <div className="flex gap-2">
-                            <Button onClick={() => approveKYC(request.id)} className="bg-green-500 hover:bg-green-600">
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Approve
-                            </Button>
-                            <Button onClick={() => rejectKYC(request.id)} variant="destructive">
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="withdrawals">
-            <Card>
-              <CardHeader>
-                <CardTitle>Withdrawal Requests</CardTitle>
-                <CardDescription>Process user withdrawal requests</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {withdrawalRequests.length === 0 ? (
-                  <div className="text-center py-12">
-                    <DollarSign className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No Withdrawal Requests</h3>
-                    <p className="text-muted-foreground">Withdrawal requests will appear here when users request them.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {withdrawalRequests.map((request) => (
-                      <div key={request.id} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h3 className="font-semibold">Withdrawal Request #{request.id.slice(0, 8)}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Requested: {new Date(request.requested_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Badge variant={request.status === "pending" ? "secondary" : request.status === "processed" ? "default" : "destructive"}>
-                            {request.status}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <p className="text-sm font-medium">Amount</p>
-                            <p className="text-lg font-bold">₹{request.amount}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Payment Method</p>
-                            <p className="text-sm">{request.payment_method}</p>
-                          </div>
-                        </div>
-                        {request.status === "pending" && (
-                          <div className="flex gap-2">
-                            <Button onClick={() => processWithdrawal(request.id, "approve")} className="bg-green-500 hover:bg-green-600">
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Approve
-                            </Button>
-                            <Button onClick={() => processWithdrawal(request.id, "reject")} variant="destructive">
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1315,6 +1120,6 @@ const Admin = () => {
       </div>
     </div>
   );
-};
+}
 
 export default Admin;

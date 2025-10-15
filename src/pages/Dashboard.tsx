@@ -17,21 +17,23 @@ interface Profile {
   phone_verified: boolean;
 }
 
-interface Game {
+interface Quiz {
   id: string;
   title: string;
   description: string;
-  prize_amount: number;
-  prize_description: string;
-  total_questions: number;
   time_limit_minutes: number;
   entry_fee: number;
+  start_time: string;
+  end_time: string;
+  max_participants: number | null;
+  current_participants: number;
+  total_questions: number;
   status: string;
 }
 
 interface Progress {
   id: string;
-  game_id: string;
+  quiz_id: string;
   score: number;
   total_questions: number;
   correct_answers: number;
@@ -44,7 +46,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [games, setGames] = useState<Game[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -94,18 +96,28 @@ const Dashboard = () => {
 
       setProfile(profileData);
 
-      // Fetch games
-      const { data: gamesData, error: gamesError } = await supabase
-        .from("games")
-        .select("*")
+      // Fetch quizzes
+      const { data: quizzesData } = await supabase
+        .from("quizzes")
+        .select(`
+          *,
+          quiz_participants(count)
+        `)
+        .eq("status", "active")
         .order("created_at", { ascending: false });
 
-      if (gamesError) throw gamesError;
-      setGames(gamesData || []);
+      if (quizzesData) {
+        // Transform the data to include current_participants count
+        const transformedQuizzes = quizzesData.map((quiz: any) => ({
+          ...quiz,
+          current_participants: (quiz.quiz_participants as any)?.[0]?.count || 0
+        }));
+        setQuizzes(transformedQuizzes);
+      }
 
-      // Fetch user progress
+      // Fetch user progress for quizzes
       const { data: progressData, error: progressError } = await supabase
-        .from("user_game_progress")
+        .from("user_quiz_scores")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
@@ -127,14 +139,14 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  const getGameById = (gameId: string) => {
-    return games.find(g => g.id === gameId);
+  const getQuizById = (quizId: string) => {
+    return quizzes.find(q => q.id === quizId);
   };
 
-  const completedGames = progress.filter(p => p.status === "completed");
-  const totalScore = completedGames.reduce((sum, p) => sum + p.score, 0);
-  const averageScore = completedGames.length > 0
-    ? Math.round(totalScore / completedGames.length)
+  const completedQuizzes = progress.filter(p => p.status === "completed");
+  const totalScore = completedQuizzes.reduce((sum, p) => sum + p.score, 0);
+  const averageScore = completedQuizzes.length > 0
+    ? Math.round(totalScore / completedQuizzes.length)
     : 0;
 
   if (loading) {
@@ -165,8 +177,8 @@ const Dashboard = () => {
         <div className="mb-8">
           {/* Demo Quizzes Section */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-6">Demo Quizzes</h2>
-            <p className="text-muted-foreground mb-6">Try these demo quizzes to understand how the platform works. No progress will be saved.</p>
+            <h2 className="text-3xl font-bold mb-6">Demo Quizzes (Free Practice)</h2>
+            <p className="text-muted-foreground mb-6">Try these demo quizzes to understand how the platform works. No coins required and no progress saved.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Demo Quiz 1 */}
               <Card className="border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-all">
@@ -187,6 +199,10 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Difficulty:</span>
                       <span className="font-semibold">Easy</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Cost:</span>
+                      <span className="font-semibold text-green-600">FREE</span>
                     </div>
                     <Button
                       className="w-full bg-primary hover:bg-primary/90 mt-2"
@@ -218,6 +234,10 @@ const Dashboard = () => {
                       <span className="text-muted-foreground">Difficulty:</span>
                       <span className="font-semibold">Medium</span>
                     </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Cost:</span>
+                      <span className="font-semibold text-green-600">FREE</span>
+                    </div>
                     <Button
                       className="w-full bg-primary hover:bg-primary/90 mt-2"
                       onClick={() => navigate('/quiz/science-tech')}
@@ -248,6 +268,10 @@ const Dashboard = () => {
                       <span className="text-muted-foreground">Difficulty:</span>
                       <span className="font-semibold">Easy</span>
                     </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Cost:</span>
+                      <span className="font-semibold text-green-600">FREE</span>
+                    </div>
                     <Button
                       className="w-full bg-primary hover:bg-primary/90 mt-2"
                       onClick={() => navigate('/quiz/entertainment')}
@@ -262,34 +286,38 @@ const Dashboard = () => {
 
           {/* Live Quizzes Section */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-6">Live Quizzes</h2>
+            <h2 className="text-3xl font-bold mb-6">Live Quizzes (Coin Required)</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {games.filter(g => g.status === "active").map((game) => (
-                <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg">
+              {quizzes.filter(q => q.status === "active").map((quiz) => (
+                <Card key={quiz.id} className="border-2 hover:border-primary transition-all hover:shadow-lg">
                   <CardHeader>
-                    <CardTitle className="text-xl">{game.title}</CardTitle>
-                    <CardDescription>{game.description}</CardDescription>
+                    <CardTitle className="text-xl">{quiz.title}</CardTitle>
+                    <CardDescription>{quiz.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Prize:</span>
-                        <span className="font-semibold text-primary">{game.prize_description}</span>
+                        <span className="text-muted-foreground">Participants:</span>
+                        <span className="font-semibold">{quiz.current_participants}/{quiz.max_participants || '∞'}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Questions:</span>
-                        <span className="font-semibold">{game.total_questions}</span>
+                        <span className="font-semibold">{quiz.total_questions || 'N/A'}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Time Limit:</span>
-                        <span className="font-semibold">{game.time_limit_minutes} min</span>
+                        <span className="font-semibold">{quiz.time_limit_minutes} min</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Entry Fee:</span>
-                        <span className="font-semibold">₹{game.entry_fee}</span>
+                        <span className="font-semibold text-yellow-600">🪙 {quiz.entry_fee} Coins</span>
                       </div>
-                      <Button className="w-full bg-primary hover:bg-primary/90 mt-2">
-                        Play Now
+                      <Button
+                        className="w-full bg-primary hover:bg-primary/90 mt-2"
+                        onClick={() => navigate(`/quiz/${quiz.id}`)}
+                        disabled={quiz.max_participants !== null && quiz.current_participants >= quiz.max_participants}
+                      >
+                        {quiz.max_participants !== null && quiz.current_participants >= quiz.max_participants ? 'Full' : 'Play Now'}
                       </Button>
                     </div>
                   </CardContent>
@@ -302,29 +330,29 @@ const Dashboard = () => {
           <div>
             <h2 className="text-3xl font-bold mb-6">Upcoming Quizzes</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {games.filter(g => g.status === "upcoming").map((game) => (
-                <Card key={game.id} className="border-2 hover:border-primary transition-all hover:shadow-lg opacity-75">
+              {quizzes.filter(q => q.status === "draft").map((quiz) => (
+                <Card key={quiz.id} className="border-2 hover:border-primary transition-all hover:shadow-lg opacity-75">
                   <CardHeader>
-                    <CardTitle className="text-xl">{game.title}</CardTitle>
-                    <CardDescription>{game.description}</CardDescription>
+                    <CardTitle className="text-xl">{quiz.title}</CardTitle>
+                    <CardDescription>{quiz.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Prize:</span>
-                        <span className="font-semibold text-primary">{game.prize_description}</span>
+                        <span className="text-muted-foreground">Participants:</span>
+                        <span className="font-semibold">{quiz.current_participants}/{quiz.max_participants || '∞'}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Questions:</span>
-                        <span className="font-semibold">{game.total_questions}</span>
+                        <span className="font-semibold">{quiz.total_questions || 'N/A'}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Time Limit:</span>
-                        <span className="font-semibold">{game.time_limit_minutes} min</span>
+                        <span className="font-semibold">{quiz.time_limit_minutes} min</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Entry Fee:</span>
-                        <span className="font-semibold">₹{game.entry_fee}</span>
+                        <span className="font-semibold text-yellow-600">🪙 {quiz.entry_fee} Coins</span>
                       </div>
                       <Button className="w-full bg-muted hover:bg-muted/90 mt-2" disabled>
                         Coming Soon

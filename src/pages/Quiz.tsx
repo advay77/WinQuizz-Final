@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Clock, Trophy, CheckCircle, XCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import { Clock, Trophy, CheckCircle, XCircle, ArrowLeft, ArrowRight, Coins, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { getQuizById, Question, QuizData } from "@/lib/questions";
@@ -15,6 +16,39 @@ interface QuizResult {
   selectedAnswer: number;
   correctAnswer: number;
   isCorrect: boolean;
+}
+
+interface DatabaseQuestion {
+  id: string;
+  quiz_id: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_answer: string;
+  is_active: boolean;
+}
+
+interface DatabaseQuiz {
+  id: string;
+  title: string;
+  description: string;
+  time_limit_minutes: number;
+  entry_fee: number;
+  start_time: string;
+  end_time: string;
+  total_questions: number;
+  max_participants: number | null;
+  current_participants: number;
+  status: string;
+  created_at: string;
+  created_by: string;
+  quiz_questions?: DatabaseQuestion[];
+}
+
+interface UserWallet {
+  coins: number;
 }
 
 const Quiz = () => {
@@ -28,19 +62,183 @@ const Quiz = () => {
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [userWallet, setUserWallet] = useState<UserWallet | null>(null);
+  const [checkingBalance, setCheckingBalance] = useState(false);
 
   useEffect(() => {
     if (quizId) {
-      const quizData = getQuizById(quizId);
-      if (quizData) {
-        setQuiz(quizData);
-        setTimeLeft(quizData.timeLimit * 60); // Convert minutes to seconds
-      } else {
+      loadQuiz(quizId);
+    }
+  }, [quizId]);
+
+  const loadQuiz = async (id: string) => {
+    try {
+      // First, try to get it as a demo quiz
+      const demoQuiz = getQuizById(id);
+      if (demoQuiz) {
+        setQuiz(demoQuiz);
+        setTimeLeft(demoQuiz.timeLimit * 60);
+        return;
+      }
+
+      // If not a demo quiz, try to fetch from database
+      const { data: quizData, error: quizError } = await supabase
+        .from("quizzes")
+        .select(`
+          *,
+          quiz_questions(*)
+        `)
+        .eq("id", id)
+        .eq("status", "active")
+        .single();
+
+      if (quizError || !quizData) {
         toast.error("Quiz not found");
         navigate("/dashboard");
+        return;
       }
+
+      // Transform database quiz to QuizData format
+      const dbQuiz = quizData as DatabaseQuiz;
+      const databaseQuiz: QuizData = {
+        id: dbQuiz.id,
+        title: dbQuiz.title,
+        description: dbQuiz.description,
+        timeLimit: dbQuiz.time_limit_minutes,
+        difficulty: 'medium', // Default difficulty for database quizzes
+        questions: dbQuiz.quiz_questions?.map((q, index) => ({
+          id: q.id,
+          question: q.question,
+          options: [q.option_a, q.option_b, q.option_c, q.option_d],
+          correctAnswer: ['A', 'B', 'C', 'D'].indexOf(q.correct_answer),
+          explanation: `Answer: ${q.correct_answer}`
+        })) || []
+      };
+
+      setQuiz(databaseQuiz);
+      setTimeLeft(dbQuiz.time_limit_minutes * 60);
+    } catch (error) {
+      console.error("Error loading quiz:", error);
+      toast.error("Failed to load quiz");
+      navigate("/dashboard");
     }
-  }, [quizId, navigate]);
+  };
+
+  const checkWalletBalance = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please log in to take this quiz");
+        return false;
+      }
+
+      // For demo quizzes, always allow (they're free)
+      if (getQuizById(quizId || '')) {
+        return true;
+      }
+
+      // For database quizzes, check wallet balance
+      const { data: walletData } = await supabase
+        .from("profiles")
+        .select("wallet_balance")
+        .eq("id", user.id)
+        .single();
+
+      if (!walletData) {
+        toast.error("Wallet not found. Please contact support.");
+        return false;
+      }
+
+      setUserWallet(walletData as UserWallet);
+
+      // For free quizzes (entry_fee = 0), allow access
+      if (quiz && 'entry_fee' in quiz && (quiz as any).entry_fee === 0) {
+        return true;
+      }
+
+      // Check if user has enough coins
+      if ((walletData as UserWallet).coins < (quiz as any)?.entry_fee) {
+        toast.error(`Insufficient coins! You need ${(quiz as any)?.entry_fee} coins but only have ${(walletData as UserWallet).coins}.`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error checking wallet balance:", error);
+      toast.error("Failed to check wallet balance");
+      return false;
+    }
+  };
+
+  const deductQuizCoins = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      // For demo quizzes, no deduction needed
+      if (getQuizById(quizId || '')) {
+        return true;
+      }
+
+      // Deduct coins directly from wallet
+      const entryFee = (quiz as any)?.entry_fee || 0;
+      const { error: updateError } = await supabase
+        .from("profiles")
+        // @ts-ignore - Supabase client typing issue
+        .update({
+          wallet_balance: (userWallet?.coins || 0) - entryFee,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", user.id);
+
+      if (updateError) {
+        console.error("Error deducting coins:", updateError);
+        toast.error("Failed to process payment");
+        return false;
+      }
+
+      // Update local wallet state
+      if (userWallet) {
+        setUserWallet({ coins: userWallet.coins - ((quiz as any)?.entry_fee || 0) });
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deducting coins:", error);
+      toast.error("Failed to process payment");
+      return false;
+    }
+  };
+
+  const startQuiz = async () => {
+    setCheckingBalance(true);
+
+    try {
+      // Check wallet balance first
+      const hasBalance = await checkWalletBalance();
+      if (!hasBalance) {
+        setCheckingBalance(false);
+        return;
+      }
+
+      // Deduct coins if it's a paid quiz
+      if (quiz && 'entry_fee' in quiz && (quiz as any).entry_fee > 0) {
+        const deducted = await deductQuizCoins();
+        if (!deducted) {
+          setCheckingBalance(false);
+          return;
+        }
+        toast.success(`Paid ${(quiz as any).entry_fee} coins to start the quiz!`);
+      }
+
+      setQuizStarted(true);
+    } catch (error) {
+      console.error("Error starting quiz:", error);
+      toast.error("Failed to start quiz");
+    } finally {
+      setCheckingBalance(false);
+    }
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -58,10 +256,6 @@ const Quiz = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const startQuiz = () => {
-    setQuizStarted(true);
   };
 
   const handleAnswerSelect = (answerIndex: number) => {
@@ -149,12 +343,42 @@ const Quiz = () => {
                   </div>
                 </div>
 
+                {/* Wallet Balance Display for Database Quizzes */}
+                {!getQuizById(quizId || '') && (
+                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Coins className="h-5 w-5 text-yellow-600" />
+                      <h3 className="font-semibold text-yellow-800">Entry Fee Required</h3>
+                    </div>
+                    {userWallet ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-yellow-700">
+                          Your Balance: <span className="font-bold">{userWallet.coins} coins</span>
+                        </span>
+                        <span className="text-sm text-yellow-700">
+                          Quiz Fee: <span className="font-bold">{(quiz as any)?.entry_fee || 0} coins</span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-yellow-700">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm">Checking wallet balance...</span>
+                      </div>
+                    )}
+                    {(quiz as any)?.entry_fee > 0 && userWallet && userWallet.coins < (quiz as any)?.entry_fee && (
+                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                        ⚠️ Insufficient coins! You need {(quiz as any)?.entry_fee} coins but only have {userWallet.coins}.
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <h3 className="font-semibold mb-2">Quiz Instructions:</h3>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Answer all questions to complete the quiz</li>
                     <li>• You have {quiz.timeLimit} minutes to finish</li>
-                    <li>• This is a demo quiz - no progress will be saved</li>
+                    {!getQuizById(quizId || '') && <li>• Entry fee will be deducted from your wallet</li>}
                     <li>• You can review your answers at the end</li>
                   </ul>
                 </div>

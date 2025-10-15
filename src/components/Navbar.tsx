@@ -1,4 +1,4 @@
-import { Trophy, User, LogOut, BarChart3, Home, Menu, X, Settings, Phone, Wallet, Shield, ChevronDown } from "lucide-react";
+import { Trophy, User, LogOut, BarChart3, Home, Menu, X, Settings, Phone, Wallet, Shield, ChevronDown, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -88,6 +88,16 @@ const Navbar = () => {
               <BarChart3 className="h-4 w-4" />
               Progress
             </Link>
+            <Link to="/leaderboard" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              Leaderboard
+            </Link>
+            {profile?.role === 'admin' && (
+              <Link to="/admin" className="text-foreground hover:text-primary transition-colors flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-md">
+                <Shield className="h-4 w-4" />
+                Admin Panel
+              </Link>
+            )}
           </div>
 
           {/* Mobile Hamburger Menu Button */}
@@ -110,7 +120,14 @@ const Navbar = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel className="flex flex-col space-y-1">
-                  <span className="font-semibold">{profile?.full_name || user.email?.split('@')[0]}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{profile?.full_name || user.email?.split('@')[0]}</span>
+                    {profile?.role === 'admin' && (
+                      <Badge variant="secondary" className="text-xs bg-red-100 text-red-800">
+                        ADMIN
+                      </Badge>
+                    )}
+                  </div>
                   <span className="text-xs text-muted-foreground">{user.email}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
