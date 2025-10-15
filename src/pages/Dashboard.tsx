@@ -163,6 +163,103 @@ const Dashboard = () => {
 
         {/* Main Content - Removed Sidebar */}
         <div className="mb-8">
+          {/* Demo Quizzes Section */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-6">Demo Quizzes</h2>
+            <p className="text-muted-foreground mb-6">Try these demo quizzes to understand how the platform works. No progress will be saved.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Demo Quiz 1 */}
+              <Card className="border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-all">
+                <CardHeader>
+                  <CardTitle className="text-xl">General Knowledge Demo</CardTitle>
+                  <CardDescription>Test your basic knowledge with this demo quiz</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Questions:</span>
+                      <span className="font-semibold">10</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Time Limit:</span>
+                      <span className="font-semibold">1 min</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Difficulty:</span>
+                      <span className="font-semibold">Easy</span>
+                    </div>
+                    <Button
+                      className="w-full bg-primary hover:bg-primary/90 mt-2"
+                      onClick={() => navigate('/quiz/general-knowledge')}
+                    >
+                      Try Demo
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Demo Quiz 2 */}
+              <Card className="border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-all">
+                <CardHeader>
+                  <CardTitle className="text-xl">Science & Technology Demo</CardTitle>
+                  <CardDescription>Explore science questions in demo mode</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Questions:</span>
+                      <span className="font-semibold">15</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Time Limit:</span>
+                      <span className="font-semibold">1 min</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Difficulty:</span>
+                      <span className="font-semibold">Medium</span>
+                    </div>
+                    <Button
+                      className="w-full bg-primary hover:bg-primary/90 mt-2"
+                      onClick={() => navigate('/quiz/science-tech')}
+                    >
+                      Try Demo
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Demo Quiz 3 */}
+              <Card className="border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-all">
+                <CardHeader>
+                  <CardTitle className="text-xl">Entertainment Demo</CardTitle>
+                  <CardDescription>Movies, music, and pop culture questions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Questions:</span>
+                      <span className="font-semibold">12</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Time Limit:</span>
+                      <span className="font-semibold">1 min</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Difficulty:</span>
+                      <span className="font-semibold">Easy</span>
+                    </div>
+                    <Button
+                      className="w-full bg-primary hover:bg-primary/90 mt-2"
+                      onClick={() => navigate('/quiz/entertainment')}
+                    >
+                      Try Demo
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
           {/* Live Quizzes Section */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold mb-6">Live Quizzes</h2>

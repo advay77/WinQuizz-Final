@@ -1,14 +1,35 @@
-import { Trophy, User, LogOut, BarChart3, Home, Menu, X } from "lucide-react";
+import { Trophy, User, LogOut, BarChart3, Home, Menu, X, Settings, Phone, Wallet, Shield, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+
+interface Profile {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  full_name: string | null;
+  email_verified: boolean;
+  phone_verified: boolean;
+  role?: string | null;
+  wallet_balance?: number | null;
+  documents_verified?: boolean | null;
+}
 
 const Navbar = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -24,15 +45,15 @@ const Navbar = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-      
+
       // Fetch user profile if user exists
       if (user) {
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("full_name")
+          .select("*")
           .eq("id", user.id)
           .single();
-        
+
         setProfile(profileData);
       }
     } catch (error) {
@@ -77,16 +98,74 @@ const Navbar = () => {
             {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
 
-          {/* Desktop User Info & Logout */}
+          {/* Desktop User Dropdown */}
           <div className="hidden md:flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <User className="h-4 w-4" />
-              <span>{profile?.full_name || user.email?.split('@')[0]}</span>
-            </div>
-            <Button variant="ghost" onClick={handleLogout} className="hover:text-primary flex items-center gap-2">
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 hover:bg-accent">
+                  <User className="h-4 w-4" />
+                  <span className="text-sm">{profile?.full_name || user.email?.split('@')[0]}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="flex flex-col space-y-1">
+                  <span className="font-semibold">{profile?.full_name || user.email?.split('@')[0]}</span>
+                  <span className="text-xs text-muted-foreground">{user.email}</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                {/* Wallet Balance */}
+                <DropdownMenuItem className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">Wallet Balance</span>
+                    <span className="text-xs text-muted-foreground">₹{profile?.wallet_balance?.toFixed(2) || '0.00'}</span>
+                  </div>
+                </DropdownMenuItem>
+
+                {/* KYC Status */}
+                <DropdownMenuItem className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">KYC Status</span>
+                    <div className="flex gap-1 mt-1">
+                      <Badge variant={profile?.email_verified ? "default" : "secondary"} className="text-xs">
+                        Email {profile?.email_verified ? "✓" : "✗"}
+                      </Badge>
+                      <Badge variant={profile?.phone_verified ? "default" : "secondary"} className="text-xs">
+                        Phone {profile?.phone_verified ? "✓" : "✗"}
+                      </Badge>
+                      <Badge variant={profile?.documents_verified ? "default" : "secondary"} className="text-xs">
+                        Docs {profile?.documents_verified ? "✓" : "✗"}
+                      </Badge>
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                {/* Info & Settings */}
+                <DropdownMenuItem className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  <span>Info & Settings</span>
+                </DropdownMenuItem>
+
+                {/* 24*7 Contact */}
+                <DropdownMenuItem className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  <span>24*7 Contact</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                {/* Logout */}
+                <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-700">
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

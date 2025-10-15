@@ -10,6 +10,7 @@ import Verify from "./pages/Verify";
 import Dashboard from "./pages/Dashboard";
 import Progress from "./pages/Progress";
 import Admin from "./pages/Admin";
+import Quiz from "./pages/Quiz";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/quiz/:quizId" element={<Quiz />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -38,7 +40,3 @@ function App() {
 }
 
 export default App;
-<>
-  <Navbar />
-  {/* rest of page content */}
-</>

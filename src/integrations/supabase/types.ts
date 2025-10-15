@@ -58,6 +58,8 @@ export interface Database {
           phone_verified: boolean | null
           role: string | null
           updated_at: string | null
+          wallet_balance: number | null
+          documents_verified: boolean | null
         }
         Insert: {
           created_at?: string | null
@@ -69,6 +71,8 @@ export interface Database {
           phone_verified?: boolean | null
           role?: string | null
           updated_at?: string | null
+          wallet_balance?: number | null
+          documents_verified?: boolean | null
         }
         Update: {
           created_at?: string | null
@@ -80,6 +84,8 @@ export interface Database {
           phone_verified?: boolean | null
           role?: string | null
           updated_at?: string | null
+          wallet_balance?: number | null
+          documents_verified?: boolean | null
         }
       }
       user_game_progress: {
