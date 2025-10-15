@@ -2,18 +2,20 @@
 
 ## ⚡ 3-Step Setup
 
-### Step 1: Run SQL Migration (2 minutes)
-1. Open **Lovable Dashboard** → **Database/Supabase** → **SQL Editor**
-2. Copy content from `supabase-migration.sql` (or see LOVABLE_DATABASE_SETUP.md)
-3. Paste and click **Run**
-
-### Step 2: Create Admin User (30 seconds)
-```sql
--- Replace with your email
-UPDATE public.profiles 
-SET role = 'admin' 
-WHERE email = 'your-email@example.com';
+### Step 1: Deploy Migration (2 minutes)
+```bash
+# The migration file is already created!
+git add supabase/migrations/20251015110000_add_admin_panel_tables.sql
+git commit -m "Add admin panel tables"
+git push origin main
 ```
+**Lovable will automatically apply the migration!** ✨
+
+### Step 2: Make Yourself Admin (30 seconds)
+1. Go to **Lovable Dashboard** → **Database** → **profiles** table
+2. Find your email and click to edit
+3. Change `role` from `user` to `admin`
+4. Save
 
 ### Step 3: Access Admin Panel (10 seconds)
 1. Login to your app
