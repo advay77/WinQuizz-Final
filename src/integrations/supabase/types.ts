@@ -129,6 +129,76 @@ export interface Database {
           user_id?: string | null
         }
       }
+      quizzes: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          start_time: string | null
+          end_time: string | null
+          status: string
+          total_questions: number
+          created_at: string
+          created_by: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          start_time?: string | null
+          end_time?: string | null
+          status?: string
+          total_questions?: number
+          created_at?: string
+          created_by: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          start_time?: string | null
+          end_time?: string | null
+          status?: string
+          total_questions?: number
+          created_at?: string
+          created_by?: string
+        }
+      }
+      user_quiz_scores: {
+        Row: {
+          id: string
+          user_id: string
+          quiz_id: string
+          score: number
+          total_questions: number
+          correct_answers: number
+          time_taken_seconds: number | null
+          completed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          quiz_id: string
+          score?: number
+          total_questions: number
+          correct_answers?: number
+          time_taken_seconds?: number | null
+          completed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          quiz_id?: string
+          score?: number
+          total_questions?: number
+          correct_answers?: number
+          time_taken_seconds?: number | null
+          completed_at?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

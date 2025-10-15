@@ -9,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Shield, LogOut, CheckCircle, XCircle, Eye, DollarSign, Plus, Edit, Trash2, BookOpen, BarChart3 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Users, Shield, LogOut, CheckCircle, XCircle, Eye, DollarSign, Plus, Edit, Trash2, BookOpen, BarChart3, Loader2, PlayCircle, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
-import type { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";  
+import { format } from "date-fns";
 
 interface Profile {
   id: string;
@@ -66,6 +68,37 @@ interface WithdrawalRequest {
   account_details: string;
 }
 
+interface Quiz {
+  id: string;
+  title: string;
+  description: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  total_questions: number;
+  created_at: string;
+  created_by: string;
+}
+
+interface UserQuizScore {
+  id: string;
+  user_id: string;
+  quiz_id: string;
+  score: number;
+  total_questions: number;
+  correct_answers: number;
+  time_taken_seconds: number | null;
+  completed_at: string | null;
+  created_at: string;
+  profiles?: {
+    email: string | null;
+    full_name: string | null;
+  };
+  quizzes?: {
+    title: string;
+  };
+}
+
 const Admin = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -74,8 +107,12 @@ const Admin = () => {
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [kycRequests, setKycRequests] = useState<KYCRequest[]>([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [scores, setScores] = useState<UserQuizScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddQuestion, setShowAddQuestion] = useState(false);
+  const [showCreateQuiz, setShowCreateQuiz] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Form state for adding/editing questions
   const [questionForm, setQuestionForm] = useState({
@@ -88,6 +125,14 @@ const Admin = () => {
     correct_answer: '',
     explanation: '',
     difficulty: 'easy'
+  });
+
+  // Form state for creating quizzes
+  const [quizForm, setQuizForm] = useState({
+    title: '',
+    description: '',
+    total_questions: 10,
+    status: 'draft' as const
   });
 
   useEffect(() => {
@@ -136,6 +181,30 @@ const Admin = () => {
 
       if (questionsError) throw questionsError;
       setQuizQuestions(questionsData || []);
+
+      // Fetch quizzes
+      const { data: quizzesData, error: quizzesError } = await supabase
+        .from("quizzes")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!quizzesError) {
+        setQuizzes(quizzesData || []);
+      }
+
+      // Fetch quiz scores
+      const { data: scoresData, error: scoresError } = await supabase
+        .from("user_quiz_scores")
+        .select(`
+          *,
+          profiles(email, full_name),
+          quizzes(title)
+        `)
+        .order("completed_at", { ascending: false });
+
+      if (!scoresError) {
+        setScores(scoresData || []);
+      }
 
       // Fetch KYC requests (we'll need to create this table)
       // For now, we'll show empty state
@@ -277,6 +346,105 @@ const Admin = () => {
     return categories[category] || category;
   };
 
+  const updateUserRole = async (userId: string, newRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole } as any)
+        .eq('id', userId);
+      
+      if (error) throw error;
+      
+      setUsers(users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+      
+      toast.success(`User role updated to ${newRole}`);
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast.error('Failed to update user role');
+    }
+  };
+
+  const createQuiz = async () => {
+    try {
+      if (!quizForm.title.trim()) {
+        toast.error('Please enter a quiz title');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('quizzes')
+        .insert([{
+          ...quizForm,
+          created_by: user?.id
+        }] as any)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setQuizzes([data, ...quizzes]);
+      setQuizForm({
+        title: '',
+        description: '',
+        total_questions: 10,
+        status: 'draft'
+      });
+      setShowCreateQuiz(false);
+      
+      toast.success('Quiz created successfully');
+    } catch (error) {
+      console.error('Error creating quiz:', error);
+      toast.error('Failed to create quiz');
+    }
+  };
+
+  const updateQuizStatus = async (quizId: string, newStatus: Quiz['status']) => {
+    try {
+      const updateData: any = { status: newStatus };
+      
+      if (newStatus === 'active') {
+        updateData.start_time = new Date().toISOString();
+      } else if (newStatus === 'completed') {
+        updateData.end_time = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('quizzes')
+        .update(updateData as any)
+        .eq('id', quizId);
+      
+      if (error) throw error;
+      
+      setQuizzes(quizzes.map(quiz => 
+        quiz.id === quizId ? { ...quiz, ...updateData } : quiz
+      ));
+      
+      toast.success(`Quiz ${newStatus === 'active' ? 'started' : 'ended'} successfully`);
+    } catch (error) {
+      console.error('Error updating quiz status:', error);
+      toast.error('Failed to update quiz status');
+    }
+  };
+
+  const deleteQuiz = async (quizId: string) => {
+    try {
+      const { error } = await supabase
+        .from('quizzes')
+        .delete()
+        .eq('id', quizId);
+      
+      if (error) throw error;
+      
+      setQuizzes(quizzes.filter(q => q.id !== quizId));
+      toast.success('Quiz deleted successfully');
+    } catch (error) {
+      console.error('Error deleting quiz:', error);
+      toast.error('Failed to delete quiz');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -396,13 +564,413 @@ const Admin = () => {
         </div>
 
         {/* Admin Tabs */}
-        <Tabs defaultValue="questions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="questions">Quiz Questions</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="kyc">KYC Requests</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+            <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
+            <TabsTrigger value="scores">Scores</TabsTrigger>
+            <TabsTrigger value="questions">Questions</TabsTrigger>
+            <TabsTrigger value="kyc">KYC</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="dashboard">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{users.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {users.filter(u => u.role === 'admin').length} admins
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Quizzes</CardTitle>
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {quizzes.filter(q => q.status === 'active').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {quizzes.length} total quizzes
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Quiz Attempts</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{scores.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {scores.filter(s => s.completed_at).length} completed
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg. Score</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {scores.length > 0 
+                      ? (scores.reduce((sum, score) => sum + (score.score / score.total_questions * 100), 0) / scores.length).toFixed(1) + '%'
+                      : 'N/A'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    across all quizzes
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>Latest quiz attempts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {scores.slice(0, 5).map((score) => (
+                    <div key={score.id} className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {score.profiles?.full_name || score.profiles?.email || 'Unknown user'} completed a quiz
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Scored {score.score}/{score.total_questions} ({((score.score / score.total_questions) * 100).toFixed(1)}%)
+                        </p>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {score.completed_at ? format(new Date(score.completed_at), 'MMM d, yyyy h:mm a') : 'In progress'}
+                      </p>
+                    </div>
+                  ))}
+                  {scores.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No recent activity to display
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>
+                  View and manage user accounts and permissions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Joined</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.length > 0 ? (
+                        users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              {user.full_name || 'No name'}
+                            </TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={user.role || 'user'}
+                                onValueChange={(value) => updateUserRole(user.id, value)}
+                              >
+                                <SelectTrigger className="w-[120px]">
+                                  <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="user">User</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  user.email_verified && user.phone_verified
+                                    ? 'default'
+                                    : 'secondary'
+                                }
+                              >
+                                {user.email_verified && user.phone_verified
+                                  ? 'Verified'
+                                  : 'Pending'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {user.created_at
+                                ? format(new Date(user.created_at), 'MMM d, yyyy')
+                                : 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            No users found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="quizzes">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-2xl font-bold">Quiz Management</h2>
+                <p className="text-muted-foreground">
+                  Create and manage quizzes
+                </p>
+              </div>
+              <Dialog open={showCreateQuiz} onOpenChange={setShowCreateQuiz}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Quiz
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Quiz</DialogTitle>
+                    <DialogDescription>
+                      Fill in the details to create a new quiz
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="quiz-title">Title</Label>
+                      <Input 
+                        id="quiz-title" 
+                        placeholder="Enter quiz title" 
+                        value={quizForm.title}
+                        onChange={(e) => setQuizForm({...quizForm, title: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quiz-description">Description</Label>
+                      <Textarea
+                        id="quiz-description"
+                        placeholder="Enter quiz description"
+                        rows={3}
+                        value={quizForm.description}
+                        onChange={(e) => setQuizForm({...quizForm, description: e.target.value})}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="total-questions">Total Questions</Label>
+                        <Input
+                          id="total-questions"
+                          type="number"
+                          min="1"
+                          value={quizForm.total_questions}
+                          onChange={(e) => setQuizForm({...quizForm, total_questions: parseInt(e.target.value) || 10})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="quiz-status">Status</Label>
+                        <Select 
+                          value={quizForm.status}
+                          onValueChange={(value: 'draft' | 'active') => 
+                            setQuizForm({...quizForm, status: value})
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={createQuiz}>Create Quiz</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Questions</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {quizzes.length > 0 ? (
+                        quizzes.map((quiz) => (
+                          <TableRow key={quiz.id}>
+                            <TableCell className="font-medium">
+                              {quiz.title}
+                              <p className="text-sm text-muted-foreground">
+                                {quiz.description || 'No description'}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  quiz.status === 'active'
+                                    ? 'default'
+                                    : quiz.status === 'completed'
+                                    ? 'secondary'
+                                    : 'outline'
+                                }
+                              >
+                                {quiz.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{quiz.total_questions}</TableCell>
+                            <TableCell>
+                              {format(new Date(quiz.created_at), 'MMM d, yyyy')}
+                            </TableCell>
+                            <TableCell className="text-right space-x-2">
+                              {quiz.status === 'draft' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateQuizStatus(quiz.id, 'active')}
+                                >
+                                  <PlayCircle className="h-4 w-4 mr-1" />
+                                  Start
+                                </Button>
+                              )}
+                              {quiz.status === 'active' && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => updateQuizStatus(quiz.id, 'completed')}
+                                >
+                                  <StopCircle className="h-4 w-4 mr-1" />
+                                  End
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => deleteQuiz(quiz.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="text-center py-8 text-muted-foreground"
+                          >
+                            No quizzes found. Create your first quiz to get started.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="scores">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quiz Results</CardTitle>
+                <CardDescription>
+                  View and analyze quiz scores and performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Quiz</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead>Correct</TableHead>
+                        <TableHead>Time Taken</TableHead>
+                        <TableHead>Completed At</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {scores.length > 0 ? (
+                        scores.map((score) => (
+                          <TableRow key={score.id}>
+                            <TableCell className="font-medium">
+                              {score.profiles?.full_name || score.profiles?.email || 'Unknown user'}
+                            </TableCell>
+                            <TableCell>{score.quizzes?.title || 'Unknown quiz'}</TableCell>
+                            <TableCell>
+                              <Badge variant={score.score / score.total_questions >= 0.7 ? 'default' : 'secondary'}>
+                                {score.score}/{score.total_questions} (
+                                {((score.score / score.total_questions) * 100).toFixed(1)}%)
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{score.correct_answers}</TableCell>
+                            <TableCell>
+                              {score.time_taken_seconds
+                                ? `${Math.floor(score.time_taken_seconds / 60)}m ${score.time_taken_seconds % 60}s`
+                                : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {score.completed_at
+                                ? format(new Date(score.completed_at), 'MMM d, yyyy h:mm a')
+                                : 'In progress'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="text-center py-8 text-muted-foreground"
+                          >
+                            No quiz results available yet.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="questions">
             <Card>
