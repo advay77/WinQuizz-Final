@@ -92,6 +92,10 @@ const Navbar = () => {
               <Award className="h-4 w-4" />
               Leaderboard
             </Link>
+            <Link to="/withdrawal" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Withdraw
+            </Link>
             {profile?.role === 'admin' && (
               <Link to="/admin" className="text-foreground hover:text-primary transition-colors flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-md">
                 <Shield className="h-4 w-4" />
@@ -206,6 +210,32 @@ const Navbar = () => {
                 <BarChart3 className="h-4 w-4" />
                 Progress
               </Link>
+              <Link 
+                to="/leaderboard" 
+                className="flex items-center gap-2 text-foreground hover:text-primary transition-colors py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Award className="h-4 w-4" />
+                Leaderboard
+              </Link>
+              <Link 
+                to="/withdrawal" 
+                className="flex items-center gap-2 text-foreground hover:text-primary transition-colors py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Wallet className="h-4 w-4" />
+                Withdraw
+              </Link>
+              {profile?.role === 'admin' && (
+                <Link 
+                  to="/admin" 
+                  className="flex items-center gap-2 text-foreground hover:text-primary transition-colors py-2 bg-primary/10 px-3 rounded-md"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin Panel
+                </Link>
+              )}
               <div className="border-t border-border pt-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                   <User className="h-4 w-4" />

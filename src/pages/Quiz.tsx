@@ -149,7 +149,9 @@ const Quiz = () => {
         return false;
       }
 
-      setUserWallet(walletData as UserWallet);
+      // Set wallet with correct structure
+      const walletBalance = (walletData as { wallet_balance: number }).wallet_balance || 0;
+      setUserWallet({ coins: walletBalance });
 
       // For free quizzes (entry_fee = 0), allow access
       if (quiz && 'entry_fee' in quiz && (quiz as any).entry_fee === 0) {
@@ -157,8 +159,8 @@ const Quiz = () => {
       }
 
       // Check if user has enough coins
-      if ((walletData as UserWallet).coins < (quiz as any)?.entry_fee) {
-        toast.error(`Insufficient coins! You need ${(quiz as any)?.entry_fee} coins but only have ${(walletData as UserWallet).coins}.`);
+      if (walletBalance < (quiz as any)?.entry_fee) {
+        toast.error(`Insufficient coins! You need ${(quiz as any)?.entry_fee} coins but only have ${walletBalance}.`);
         return false;
       }
 
@@ -180,13 +182,27 @@ const Quiz = () => {
         return true;
       }
 
+      // Get current wallet balance
+      const { data: currentWallet } = await supabase
+        .from("profiles")
+        .select("wallet_balance")
+        .eq("id", user.id)
+        .single();
+
+      if (!currentWallet) {
+        toast.error("Wallet not found");
+        return false;
+      }
+
       // Deduct coins directly from wallet
       const entryFee = (quiz as any)?.entry_fee || 0;
+      const newBalance = (currentWallet as { wallet_balance: number }).wallet_balance - entryFee;
+
       const { error: updateError } = await supabase
         .from("profiles")
-        // @ts-ignore - Supabase client typing issue
+        // @ts-ignore - TypeScript doesn't recognize wallet_balance field
         .update({
-          wallet_balance: (userWallet?.coins || 0) - entryFee,
+          wallet_balance: newBalance,
           updated_at: new Date().toISOString()
         })
         .eq("id", user.id);
@@ -199,7 +215,7 @@ const Quiz = () => {
 
       // Update local wallet state
       if (userWallet) {
-        setUserWallet({ coins: userWallet.coins - ((quiz as any)?.entry_fee || 0) });
+        setUserWallet({ coins: newBalance });
       }
 
       return true;
@@ -207,6 +223,43 @@ const Quiz = () => {
       console.error("Error deducting coins:", error);
       toast.error("Failed to process payment");
       return false;
+    }
+  };
+
+  const saveQuizResults = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // For demo quizzes, don't save to database
+      if (getQuizById(quizId || '')) {
+        return;
+      }
+
+      const score = calculateScore();
+      const correctAnswers = answers.filter(a => a.isCorrect).length;
+
+      // Save to user_quiz_scores table (existing table)
+      const { error: scoreError } = await supabase
+        .from("user_quiz_scores")
+        // @ts-ignore - TypeScript doesn't recognize table structure
+        .insert({
+          user_id: user.id,
+          quiz_id: quizId,
+          score: correctAnswers,
+          total_questions: quiz!.questions.length,
+          completed_at: new Date().toISOString()
+        });
+
+      if (scoreError) {
+        console.error("Error saving quiz score:", scoreError);
+      }
+
+      // The leaderboard will be automatically updated by the database trigger
+      // that we created in CREATE_LEADERBOARD_SYSTEM.sql
+
+    } catch (error) {
+      console.error("Error saving quiz results:", error);
     }
   };
 
@@ -288,9 +341,13 @@ const Quiz = () => {
     }
   };
 
-  const handleQuizComplete = () => {
+  const handleQuizComplete = async () => {
     setQuizCompleted(true);
     setShowResults(true);
+
+    // Save quiz results to database for leaderboard
+    await saveQuizResults();
+
     toast.success("Quiz completed!");
   };
 
