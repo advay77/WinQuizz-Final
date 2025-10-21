@@ -89,8 +89,8 @@ const FeaturesSection: React.FC = () => {
   ];
 
   return (
-    <section id="features" className="py-20 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="features" className="w-full py-20 bg-gray-50">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <FadeInUp>
           <div className="text-center mb-16">
             <motion.h2

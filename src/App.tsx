@@ -42,28 +42,42 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
-      <HeroSection 
-        participants={1000}
-        contests={50}
-        prizes={10000}
-        onLoginClick={() => window.location.href = '/auth'}
-        onHowItWorksClick={() => scrollToSection('how-it-works')}
-      />
-      
-      <HowItWorks />
-      
-      <section id="features" className="py-16 md:py-24 bg-muted/20">
-        <FeaturesSection />
-      </section>
-      
-      <div id="sample-quizzes" className="py-16 md:py-24">
-        <SampleQuizzesSection />
+    <div className="min-h-screen w-full overflow-x-hidden">
+      <div className="w-full">
+        <HeroSection 
+          participants={1000}
+          contests={50}
+          prizes={10000}
+          onLoginClick={() => window.location.href = '/auth'}
+          onHowItWorksClick={() => scrollToSection('how-it-works')}
+        />
       </div>
       
-      <TrustSection />
-      <TestimonialsSection />
-      <CTASection />
+      <div className="w-full">
+        <HowItWorks />
+      </div>
+      
+      <section id="features" className="w-full py-16 md:py-24 bg-muted/20">
+        <div className="w-full">
+          <FeaturesSection />
+        </div>
+      </section>
+      
+      <div id="sample-quizzes" className="w-full py-16 md:py-24">
+        <div className="w-full">
+          <SampleQuizzesSection />
+        </div>
+      </div>
+      
+      <div className="w-full">
+        <TrustSection />
+      </div>
+      <div className="w-full">
+        <TestimonialsSection />
+      </div>
+      <div className="w-full">
+        <CTASection />
+      </div>
     </div>
   );
 };

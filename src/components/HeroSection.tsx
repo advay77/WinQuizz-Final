@@ -33,10 +33,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ participants, contests, prize
   });
 
   return (
-    <section className="relative bg-gradient-to-br from-red-50 to-red-100 py-20 hero-pattern overflow-hidden">
+    <section className="relative w-full bg-gradient-to-br from-red-50 to-red-100 py-20 hero-pattern overflow-hidden">
       <ParticleBackground count={15} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="w-full px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center max-w-4xl mx-auto">
           {/* Heading */}
           <FadeInUp delay={0.2}>
