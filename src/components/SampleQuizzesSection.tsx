@@ -400,33 +400,197 @@ const SampleQuizzesSection: React.FC = () => {
     );
   };
 
+  // Render the quiz questions
+  const renderQuizQuestion = () => {
+    if (!selectedQuiz) return null;
+
+    const currentQ = selectedQuiz.questions_data[currentQuestion];
+    const IconComponent = selectedQuiz.icon === "Brain" ? Brain : selectedQuiz.icon === "Zap" ? Zap : Trophy;
+
+    return (
+      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-lg p-6">
+        {/* Quiz Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center">
+            <div className={`p-2 rounded-lg bg-gradient-to-r ${selectedQuiz.color} mr-3`}>
+              <IconComponent className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{selectedQuiz.title}</h3>
+              <p className="text-sm text-gray-600">Question {currentQuestion + 1} of {selectedQuiz.total_questions}</p>
+            </div>
+          </div>
+          <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
+            <Clock className="h-4 w-4 text-gray-600 mr-1" />
+            <span className="text-sm font-medium">{timeLeft}s</span>
+          </div>
+        </div>
+
+        {/* Question */}
+        <div className="mb-8">
+          <h4 className="text-xl font-medium text-gray-900 mb-2">{currentQ.question_english}</h4>
+          <p className="text-gray-600 mb-6">{currentQ.question_hindi}</p>
+          
+          {/* Options */}
+          <div className="space-y-3">
+            {currentQ.options.map((option, index) => {
+              const isSelected = selectedAnswer === index;
+              const isCorrect = index === currentQ.correct;
+              let optionClass = "w-full text-left p-4 rounded-lg border-2 border-gray-200 hover:border-red-300 transition-colors";
+              
+              if (answered) {
+                if (isCorrect) {
+                  optionClass += " bg-green-50 border-green-500";
+                } else if (isSelected && !isCorrect) {
+                  optionClass += " bg-red-50 border-red-500";
+                }
+              } else if (isSelected) {
+                optionClass += " bg-red-50 border-red-500";
+              }
+
+              return (
+                <button
+                  key={index}
+                  className={optionClass}
+                  onClick={() => handleAnswerSelect(index)}
+                  disabled={answered}
+                >
+                  <div className="flex items-center">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 ${
+                      !answered ? 'bg-gray-100' : isCorrect ? 'bg-green-100' : isSelected ? 'bg-red-100' : 'bg-gray-100'
+                    }`}>
+                      {String.fromCharCode(65 + index)}
+                    </div>
+                    <span className="text-left">{option}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center">
+          <Button
+            variant="outline"
+            onClick={() => handleSkipQuestion()}
+            disabled={answered}
+            className="flex items-center"
+          >
+            <X className="h-4 w-4 mr-2" /> Skip
+          </Button>
+          
+          {!answered ? (
+            <Button
+              onClick={handleAnswerSubmit}
+              disabled={selectedAnswer === null}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Submit Answer
+            </Button>
+          ) : (
+            <Button
+              onClick={nextQuestion}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {currentQuestion < selectedQuiz.total_questions - 1 ? 'Next Question' : 'See Results'}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render quiz results
+  const renderQuizResults = () => {
+    if (!selectedQuiz) return null;
+    
+    const correctAnswers = selectedQuiz.questions_data.reduce((acc, q) => acc + (q.correct === 0 ? 1 : 0), 0);
+    const percentage = Math.round((score / (selectedQuiz.total_questions * 20)) * 100);
+
+    return (
+      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-lg p-8 text-center">
+        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Trophy className="h-12 w-12 text-yellow-500" />
+        </div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Quiz Completed!</h2>
+        <p className="text-gray-600 mb-8">You've completed the {selectedQuiz.title}</p>
+        
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="text-2xl font-bold text-gray-900">{selectedQuiz.total_questions}</p>
+            <p className="text-sm text-gray-600">Questions</p>
+          </div>
+          <div className="bg-green-50 p-4 rounded-lg">
+            <p className="text-2xl font-bold text-green-600">{correctAnswers}</p>
+            <p className="text-sm text-green-600">Correct</p>
+          </div>
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <p className="text-2xl font-bold text-blue-600">{percentage}%</p>
+            <p className="text-sm text-blue-600">Score</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Button
+            onClick={resetQuiz}
+            className="w-full bg-red-600 hover:bg-red-700"
+          >
+            Try Another Quiz
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              resetQuiz();
+            }}
+          >
+            Back to Home
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // Main render
   return (
     <section className="py-16 bg-gradient-to-br from-red-50 to-orange-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Try Our Demo Quizzes
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Experience the thrill of quiz competitions — no signup required!
-          </p>
-        </div>
+        {selectedQuiz ? (
+          quizCompleted ? (
+            renderQuizResults()
+          ) : (
+            renderQuizQuestion()
+          )
+        ) : (
+          <>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+                Try Our Demo Quizzes
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Experience the thrill of quiz competitions — no signup required!
+              </p>
+            </div>
 
-        <div className="hidden md:grid md:grid-cols-3 gap-6 mb-8">
-          {demoQuizzes.map((quiz) => (
-            <QuizCard key={quiz.id} quiz={quiz} />
-          ))}
-        </div>
+            <div className="hidden md:grid md:grid-cols-3 gap-6 mb-8">
+              {demoQuizzes.map((quiz) => (
+                <QuizCard key={quiz.id} quiz={quiz} />
+              ))}
+            </div>
 
-        <div className="md:hidden mb-8">
-          <MobileCardSlider showNavigation showDots autoSlide={false}>
-            {demoQuizzes.map((quiz) => (
-              <div key={quiz.id} className="px-2 py-4">
-                <QuizCard quiz={quiz} />
-              </div>
-            ))}
-          </MobileCardSlider>
-        </div>
+            <div className="md:hidden mb-8">
+              <MobileCardSlider showNavigation showDots autoSlide={false}>
+                {demoQuizzes.map((quiz) => (
+                  <div key={quiz.id} className="px-2 py-4">
+                    <QuizCard quiz={quiz} />
+                  </div>
+                ))}
+              </MobileCardSlider>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
