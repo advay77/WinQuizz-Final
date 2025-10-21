@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Database } from "@/types/database.types";
+
+type Profile = Database['public']['Tables']['profiles']['Insert'];
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -49,19 +52,36 @@ const Auth = () => {
       if (data.user) {
         // Create profile directly (no trigger dependency)
         console.log("📝 Creating profile...");
-        const { data: newProfile, error: insertError } = await supabase
-          .from("profiles")
-          .insert({
-            id: data.user.id,
-            email: email,
-            phone: phone,
-            full_name: fullName,
-            role: 'user',
-            email_verified: false,
-            phone_verified: false
-          })
+        type ProfileInsert = {
+          id: string;
+          email: string;
+          phone: string;
+          full_name: string;
+          role: string;
+          email_verified: boolean;
+          phone_verified: boolean;
+          wallet_balance: number;
+          documents_verified: boolean;
+        };
+
+        const profileData: ProfileInsert = {
+          id: data.user.id,
+          email: email,
+          phone: phone,
+          full_name: fullName,
+          role: 'user',
+          email_verified: false,
+          phone_verified: false,
+          wallet_balance: 0,
+          documents_verified: false
+        };
+        
+        // Use type assertion to help TypeScript understand the type
+        const { data: newProfile, error: insertError } = await (supabase
+          .from('profiles')
+          .insert(profileData as any)
           .select()
-          .single();
+          .single());
 
         if (insertError) {
           console.error("⚠️ Profile insert error:", insertError);

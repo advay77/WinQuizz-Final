@@ -1,80 +1,131 @@
-import { Zap, Shield, Lock, FileText, Key, BarChart3 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+'use client';
 
-const features = [
-  {
-    icon: Zap,
-    title: "Skill-Based Only",
-    description: "No luck involved - pure skill and knowledge testing platform"
-  },
-  {
-    icon: Shield,
-    title: "Fraud Prevention",
-    description: "Advanced duplicate detection and device tracking systems"
-  },
-  {
-    icon: Lock,
-    title: "Secure Payments",
-    description: "PCI-DSS certified payment processing with encryption"
-  },
-  {
-    icon: FileText,
-    title: "GST Compliant",
-    description: "Fully registered with GST and TDS compliance"
-  },
-  {
-    icon: Key,
-    title: "2FA Security",
-    description: "Two-factor authentication for admin access and bot protection"
-  },
-  {
-    icon: BarChart3,
-    title: "Real-time Monitoring",
-    description: "Live contest monitoring and automated fair participation detection"
-  }
-];
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import MobileCardSlider from './MobileCardSlider';
+import { FadeInUp } from './animations/PageTransition';
 
-const FeaturesSection = () => {
+interface Feature {
+  title: string;
+  description: string;
+  badge?: string;
+}
+
+interface FeatureCardProps {
+  feature: Feature;
+}
+
+const FeatureCard: React.FC<FeatureCardProps> = ({ feature }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true }}
+    transition={{ duration: 0.5 }}
+  >
+    <Card className="border-2 border-gray-100 hover:border-red-200 transition-all duration-300 hover:shadow-lg h-full">
+      <CardHeader>
+        <div className="flex items-center space-x-3">
+          <motion.div
+            className="bg-green-100 p-2 rounded-full"
+            whileHover={{
+              backgroundColor: '#bbf7d0',
+              scale: 1.1,
+              rotate: 10,
+            }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
+            <CheckCircle className="h-6 w-6 text-green-600" />
+          </motion.div>
+          <CardTitle className="text-lg text-gray-900">{feature.title}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-gray-600 mb-3">{feature.description}</p>
+        {feature.badge && (
+          <Badge className="bg-red-100 text-red-800 hover:bg-red-200" variant="secondary">
+            {feature.badge}
+          </Badge>
+        )}
+      </CardContent>
+    </Card>
+  </motion.div>
+);
+
+const FeaturesSection: React.FC = () => {
+  const features: Feature[] = [
+    {
+      title: 'KYC Registration',
+      description: 'Secure Aadhaar/PAN verification with OTP authentication',
+      badge: 'Secure',
+    },
+    {
+      title: 'Secure Payments',
+      description: 'PCI-DSS compliant payment gateway with GST invoicing',
+      badge: 'Trusted',
+    },
+    {
+      title: 'Real Contest Participation',
+      description: 'Timed GK & puzzle challenges with live leaderboards',
+      badge: 'Live',
+    },
+    {
+      title: 'Multi-channel Notifications',
+      description: 'SMS, Email, and App push notifications for updates',
+      badge: 'Instant',
+    },
+    {
+      title: 'Public Leaderboard',
+      description: 'Top 50 public rankings with transparent scoring system',
+      badge: 'Transparent',
+    },
+    {
+      title: 'Quick Refunds',
+      description: 'Automated refund processing within 7 working days',
+      badge: 'Fast',
+    },
+  ];
+
   return (
-    <section id="features" className="py-20 px-4 bg-background">
-      <div className="container mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">Why Choose WinQuizz?</h2>
-          <p className="text-xl text-muted-foreground">Your safety and fair play are our top priorities</p>
-        </div>
+    <section id="features" className="py-20 bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeInUp>
+          <div className="text-center mb-16">
+            <motion.h2
+              className="text-4xl font-bold text-gray-900 mb-4"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+            >
+              Platform Features
+            </motion.h2>
+            <motion.p
+              className="text-xl text-gray-600"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              Everything you need for a secure and exciting contest experience
+            </motion.p>
+          </div>
+        </FadeInUp>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+        <MobileCardSlider
+          showNavigation
+          showDots
+          autoSlide
+          slideInterval={5000}
+          enableManualSlide
+          className="gap-6"
+        >
           {features.map((feature, index) => (
-            <Card key={index} className="border-2 hover:border-primary transition-colors hover:shadow-lg">
-              <CardContent className="pt-8 pb-6 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                  <feature.icon className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </CardContent>
-            </Card>
+            <FeatureCard key={index} feature={feature} />
           ))}
-        </div>
-
-        <div className="flex flex-wrap justify-center gap-6">
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <Shield className="h-5 w-5 text-primary" />
-            <span>GST Registered</span>
-          </div>
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <Lock className="h-5 w-5 text-primary" />
-            <span>PCI-DSS Compliant</span>
-          </div>
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <Zap className="h-5 w-5 text-primary" />
-            <span>100% Skill-Based</span>
-          </div>
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <FileText className="h-5 w-5 text-primary" />
-            <span>RNG Certified</span>
-          </div>
-        </div>
+        </MobileCardSlider>
       </div>
     </section>
   );

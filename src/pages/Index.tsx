@@ -3,12 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
+
 import FeaturesSection from "@/components/FeaturesSection";
 import PrizesSection from "@/components/PrizesSection";
 import Footer from "@/components/Footer";
 
 const Index = () => {
   const navigate = useNavigate();
+
+  const handleLoginClick = () => {
+    navigate('/login');
+  };
+
+  const handleHowItWorksClick = () => {
+    const featuresSection = document.getElementById('features');
+    featuresSection?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -69,8 +79,14 @@ const Index = () => {
     <div className="min-h-screen">
       <Navbar />
       <div className="pt-16"> {/* Add padding-top to account for fixed navbar */}
-        <HeroSection />
-        <FeaturesSection />
+        <HeroSection 
+          participants={1250}
+          contests={42}
+          prizes={15000}
+          onLoginClick={handleLoginClick}
+          onHowItWorksClick={handleHowItWorksClick}
+        />
+        <FeaturesSection id="features" />
         <PrizesSection />
         <Footer />
       </div>
