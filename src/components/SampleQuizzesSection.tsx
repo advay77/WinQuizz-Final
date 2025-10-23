@@ -269,7 +269,7 @@ const SampleQuizzesSection: React.FC = () => {
     setAnswered(false);
     setConsecutiveCorrect(0);
     setLastResult(null);
-  };
+  }; 
 
   const handleAnswerSelect = (answerIndex: number) => {
     if (answered) return;
