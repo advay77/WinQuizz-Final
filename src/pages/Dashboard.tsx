@@ -65,19 +65,19 @@ export default function Dashboard() {
     {
       title: "Win Exciting Prizes!",
       description: "Test your knowledge and win up to 10,000 coins in daily quizzes.",
-      image: "/hero1.jpg",
+      image: "/images/hero1.jpg",
       buttonText: "Play Now",
     },
     {
       title: "Daily Challenges",
       description: "New quizzes added daily. Never run out of challenges!",
-      image: "/hero2.jpg",
+      image: "/images/hero2.jpg",
       buttonText: "View Challenges",
     },
     {
       title: "Compete with Friends",
       description: "Challenge your friends and see who scores the highest!",
-      image: "/hero3.jpg",
+      image: "/images/hero3.jpg",
       buttonText: "Invite Friends",
     },
   ];
