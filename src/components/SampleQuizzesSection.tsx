@@ -581,7 +581,7 @@ const SampleQuizzesSection: React.FC = () => {
             </div>
 
             <div className="md:hidden mb-8">
-              <MobileCardSlider showNavigation showDots autoSlide={false}>
+              <MobileCardSlider showNavigation showDots autoSlide={true} slideInterval={3000}>
                 {demoQuizzes.map((quiz) => (
                   <div key={quiz.id} className="px-2 py-4">
                     <QuizCard quiz={quiz} />
