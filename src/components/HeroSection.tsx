@@ -59,7 +59,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ participants, contests, prize
                 transition={{ delay: 0.8, duration: 0.5, type: "spring" }}
                 className="text-red-600 block"
               >
-                Participate Smartly. Win Big.
+                Participate Smartly. Test your knowledge.
               </motion.span>
             </motion.h1>
           </FadeInUp>
