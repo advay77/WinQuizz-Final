@@ -24,7 +24,7 @@ const TrustSection: React.FC = () => {
   const features: Feature[] = [
     {
       icon: Shield,
-      title: "Skill-Based Only",
+      title: "Knowledge-Based Only",
       description: "No luck involved - pure skill and knowledge testing platform",
     },
     {

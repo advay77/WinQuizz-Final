@@ -96,6 +96,10 @@ const Navbar = () => {
               <Wallet className="h-4 w-4" />
               Withdraw
             </Link>
+            <Link to="/contest" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Contest
+            </Link>
             {profile?.role === 'admin' && (
               <Link to="/admin" className="text-foreground hover:text-primary transition-colors flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-md">
                 <Shield className="h-4 w-4" />
