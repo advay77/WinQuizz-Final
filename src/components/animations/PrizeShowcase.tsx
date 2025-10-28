@@ -32,7 +32,7 @@ const PRIZES: Prize[] = [
     value: 'Worth up to ₹15,00,000',
     color: 'from-red-500 to-red-600',
     bgColor: 'bg-red-50',
-    image: `${process.env.PUBLIC_URL}/images/prizes/car.jpg`,
+    image: 'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg',
     category: 'Car',
   },
   {
@@ -41,7 +41,8 @@ const PRIZES: Prize[] = [
     value: 'Worth up to ₹1,50,000',
     color: 'from-blue-500 to-blue-600',
     bgColor: 'bg-blue-50',
-    image: `${process.env.PUBLIC_URL}/images/prizes/smartphone.jpg`,
+    image:
+      'https://images.unsplash.com/photo-1727093493864-0bcbd16c7e6d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBzbWFydHBob25lfGVufDB8fHx8MTc1NzgzNTQ3Nnww&ixlib=rb-4.1.0&q=85',
     category: 'Smartphone',
   },
   {
@@ -50,7 +51,7 @@ const PRIZES: Prize[] = [
     value: 'Worth up to ₹1,00,000',
     color: 'from-orange-500 to-orange-600',
     bgColor: 'bg-orange-50',
-    image: `${process.env.PUBLIC_URL}/images/prizes/smartwatch.jpg`,
+    image: 'https://images.unsplash.com/photo-1660844817855-3ecc7ef21f12',
     category: 'Smartwatch',
   },
   {
@@ -59,7 +60,8 @@ const PRIZES: Prize[] = [
     value: 'Worth up to ₹2,50,000',
     color: 'from-purple-500 to-purple-600',
     bgColor: 'bg-purple-50',
-    image: `${process.env.PUBLIC_URL}/images/prizes/laptop.jpg`,
+    image:
+      'https://images.unsplash.com/photo-1754928864131-21917af96dfd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBsYXB0b3B8ZW58MHx8fHwxNzU3ODM1NTA5fDA&ixlib=rb-4.1.0&q=85',
     category: 'Laptop',
   },
   {
@@ -68,7 +70,7 @@ const PRIZES: Prize[] = [
     value: 'Participation Certificate',
     color: 'from-indigo-500 to-indigo-600',
     bgColor: 'bg-indigo-50',
-    image: `${process.env.PUBLIC_URL}/images/certificate.svg`,
+    image: '/images/certificate.svg',
     category: 'Certificate',
   },
 ];
