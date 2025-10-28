@@ -21,6 +21,8 @@ import Quiz from "./pages/Quiz";
 import Leaderboard from "./pages/Leaderboard";
 import Progress from "./pages/Progress";
 import Withdrawal from "./pages/Withdrawal";
+import LiveContest from "./pages/LiveContest";
+import Wallet from "./pages/Wallet";
 import KYC from "./pages/KYC";
 import Admin from "./pages/Admin";
 import Verify from "./pages/Verify";
@@ -103,6 +105,8 @@ const App: React.FC = () => {
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/withdrawal" element={<Withdrawal />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/contest" element={<LiveContest />} />
             <Route path="/kyc" element={<KYC />} />
 
             {/* Admin Routes */}

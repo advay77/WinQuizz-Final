@@ -67,7 +67,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ participants, contests, prize
           {/* Subheading */}
           <FadeInUp delay={0.4}>
             <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-              India's first ultimate skill-based contest platform. Compete in fun quizzes and win amazing prizes.
+              India's first ultimate knowledge-based contest platform. Compete in fun quizzes and win amazing prizes.
             </p>
           </FadeInUp>
 
