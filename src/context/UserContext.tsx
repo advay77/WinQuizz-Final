@@ -1,117 +1,127 @@
-"use client";
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
-interface User {
+interface UserProfile {
   id: string;
-  name: string;
   email: string;
   phone: string;
-  phone_verified: boolean;
+  full_name: string;
+  role: string;
   email_verified: boolean;
-  kyc_verified: boolean;
-  role?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface AuthResponse {
-  user: User;
-  token: string;
-  message?: string;
+  phone_verified: boolean;
+  wallet_balance: number;
+  documents_verified: boolean;
+  created_at: string;
+  updated_at: string;
+  avatar_url?: string;
+  last_sign_in_at?: string;
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: UserProfile | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<{ success: boolean; message: string; token?: string }>;
+  login: (email: string, password: string) => Promise<void>;
   register: (userData: {
     name: string;
     email: string;
     phone: string;
     password: string;
-  }) => Promise<{ success: boolean; message: string; userId?: string }>;
-  logout: () => void;
-  verifyOtp: (userId: string, otp: string) => Promise<{ success: boolean; message: string; token?: string }>;
-  resendOtp: (userId: string, phone: string) => Promise<{ success: boolean; message: string }>;
-  updateUser: (userData: Partial<User>) => void;
+  }) => Promise<void>;
+  logout: () => Promise<void>;
+  updateUser: (userData: Partial<UserProfile>) => void;
+  session: Session | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8001';
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Check if user is logged in on initial load
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-        } else {
-          localStorage.removeItem('token');
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        localStorage.removeItem('token');
-      } finally {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
         setLoading(false);
       }
-    };
+    });
 
-    checkAuth();
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      if (session?.user) {
+        await fetchUserProfile(session.user.id);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  const login: AuthContextType['login'] = async (identifier, password) => {
+  const fetchUserProfile = async (userId: string) => {
     try {
       setLoading(true);
-      // Check if identifier is email or phone
-      const isEmail = identifier.includes('@');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
       
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          [isEmail ? 'email' : 'phone']: identifier,
-          password,
-        }),
+      setUser(data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      toast.error('Failed to load user profile');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+      if (error) {
+        throw error;
       }
 
-      localStorage.setItem('token', data.token);
-      setUser(data.user);
-      navigate('/dashboard');
-      toast.success('Login successful!');
-      return { success: true, message: 'Login successful', token: data.token };
+      if (data.user) {
+        const profile = await fetchUserProfile(data.user.id);
+        
+        // Check if email and phone are verified
+        if (!profile.email_verified || !profile.phone_verified) {
+          navigate('/verify');
+          toast.info('Please verify your email and phone');
+        } else {
+          navigate('/dashboard');
+          toast.success('Login successful!');
+        }
+      }
     } catch (error: any) {
+      console.error('Login error:', error);
       toast.error(error.message || 'Failed to login');
-      return { success: false, message: error.message };
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -125,47 +135,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }) => {
     try {
       setLoading(true);
-      // Format phone number to include country code if not present
-      let phone = userData.phone;
-      if (phone && !phone.startsWith('+')) {
-        // Default to India (+91) if no country code provided
-        phone = `+91${phone.replace(/^0+/, '')}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      
+      // 1. Sign up the user with Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            full_name: userData.name,
+            phone: userData.phone,
+          },
+          emailRedirectTo: `${window.location.origin}/verify`,
         },
-        body: JSON.stringify({
-          ...userData,
-          phone,
-        }),
       });
 
-      const data = await response.json();
+      if (signUpError) throw signUpError;
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
-      }
-
-      // Send OTP after successful registration
-      if (data.user?.id) {
-        await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId: data.user.id, phone }),
+      if (authData.user) {
+        // 2. Create user profile in the database
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: authData.user.id,
+          email: userData.email,
+          phone: userData.phone,
+          full_name: userData.name,
+          role: 'user',
+          email_verified: false,
+          phone_verified: false,
+          wallet_balance: 0,
+          documents_verified: false,
         });
-      }
 
-      return { 
-        success: true, 
-        message: 'Registration successful. Please verify your phone with the OTP sent.',
-        userId: data.user?.id
-      };
+        if (profileError) throw profileError;
+
+        // 3. Update local state
+        setUser({
+          id: authData.user.id,
+          email: userData.email,
+          phone: userData.phone,
+          full_name: userData.name,
+          role: 'user',
+          email_verified: false,
+          phone_verified: false,
+          wallet_balance: 0,
+          documents_verified: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+        // 4. Redirect to verification page
+        toast.success('Registration successful! Please check your email to verify your account.');
+        navigate('/verify');
+      }
     } catch (error: any) {
+      console.error('Registration error:', error);
       toast.error(error.message || 'Failed to register');
       throw error;
     } finally {
@@ -173,84 +195,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const verifyOtp = async (userId: string, otp: string) => {
+  const logout = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId, otp }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'OTP verification failed');
-      }
-
-      // Update user verification status
-      if (data.user) {
-        setUser(prev => ({
-          ...prev!,
-          phone_verified: true,
-          ...(data.user)
-        }));
-      }
-
-      return { 
-        success: true, 
-        message: data.message || 'Phone number verified successfully!',
-        token: data.token
-      };
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setUser(null);
+      navigate('/auth');
+      toast.success('Logged out successfully');
     } catch (error: any) {
-      console.error('OTP verification error:', error);
-      return { 
-        success: false, 
-        message: error.message || 'Failed to verify OTP'
-      };
+      console.error('Logout error:', error);
+      toast.error(error.message || 'Failed to logout');
     } finally {
       setLoading(false);
     }
   };
 
-  const resendOtp = async (userId: string, phone: string) => {
+  const updateUser = async (userData: Partial<UserProfile>) => {
+    if (!user) return;
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/resend-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId, phone }),
-      });
+      setLoading(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update(userData)
+        .eq('id', user.id);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to resend OTP');
-      }
-
-      return { 
-        success: true, 
-        message: data.message || 'OTP resent successfully' 
-      };
+      if (error) throw error;
+      
+      // Update local state
+      setUser(prev => (prev ? { ...prev, ...userData } : null));
+      toast.success('Profile updated successfully');
     } catch (error: any) {
-      console.error('Failed to resend OTP:', error);
-      return { 
-        success: false, 
-        message: error.message || 'Failed to resend OTP' 
-      };
+      console.error('Update user error:', error);
+      toast.error(error.message || 'Failed to update profile');
+      throw error;
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    navigate('/login');
-  };
-
-  const updateUser = (userData: Partial<User>) => {
-    setUser(prev => (prev ? { ...prev, ...userData } : null));
   };
 
   return (
@@ -261,9 +244,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         register,
         logout,
-        verifyOtp,
-        resendOtp,
         updateUser,
+        session,
       }}
     >
       {children}

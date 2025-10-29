@@ -1,16 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Database } from "@/types/database.types";
-
-type Profile = Database['public']['Tables']['profiles']['Insert'];
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { useAuth } from "@/context/UserContext";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -21,6 +18,7 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState("login");
   const location = useLocation();
   const navigate = useNavigate();
+  const { login, register } = useAuth();
 
   useEffect(() => {
     if (location.state?.showLoginTab) {
@@ -33,129 +31,45 @@ const Auth = () => {
     }
   }, [location.state]);
 
-  const handleEmailSignUp = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      console.log("🚀 Starting signup process...");
-      console.log("Email:", email);
-      console.log("Phone:", phone);
-      console.log("Full Name:", fullName);
-
-      const { data, error } = await supabase.auth.signUp({
+      await register({
+        name: fullName,
         email,
+        phone,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/verify`,
-          data: {
-            full_name: fullName,
-            phone: phone,
-          }
-        },
       });
-
-      if (error) {
-        console.error("❌ Signup error:", error);
-        throw error;
-      }
       
-      console.log("✅ User created:", data.user?.id);
+      // Reset form
+      setEmail('');
+      setPassword('');
+      setFullName('');
+      setPhone('');
       
-      if (data.user) {
-        // Create profile directly (no trigger dependency)
-        console.log("📝 Creating profile...");
-        type ProfileInsert = {
-          id: string;
-          email: string;
-          phone: string;
-          full_name: string;
-          role: string;
-          email_verified: boolean;
-          phone_verified: boolean;
-          wallet_balance: number;
-          documents_verified: boolean;
-        };
+      // The actual redirect will be handled by the UserContext
+    } catch (error) {
+      console.error("Registration error:", error);
+      // Error is already handled in the register function
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        const profileData: ProfileInsert = {
-          id: data.user.id,
-          email: email,
-          phone: phone,
-          full_name: fullName,
-          role: 'user',
-          email_verified: false,
-          phone_verified: false,
-          wallet_balance: 0,
-          documents_verified: false
-        };
-        
-        // Use type assertion to help TypeScript understand the type
-        const { data: newProfile, error: insertError } = await (supabase
-          .from('profiles')
-          .insert(profileData as any)
-          .select()
-          .single());
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-        if (insertError) {
-          console.error("⚠️ Profile insert error:", insertError);
-          console.log("🔄 Trying upsert instead...");
-          
-          // Try upsert (insert or update)
-          const { data: upsertProfile, error: upsertError } = await supabase
-            .from("profiles")
-            .upsert({
-              id: data.user.id,
-              email: email,
-              phone: phone,
-              full_name: fullName,
-              role: 'user',
-              email_verified: false,
-              phone_verified: false
-            }, {
-              onConflict: 'id'
-            })
-            .select()
-            .single();
-
-          if (upsertError) {
-            console.error("❌ Upsert error:", upsertError);
-            console.log("💡 Profile creation failed, but continuing...");
-          } else {
-            console.log("✅ Profile created via upsert:", upsertProfile);
-          }
-        } else {
-          console.log("✅ Profile created successfully:", newProfile);
-        }
-
-        console.log("🎉 Signup complete! Redirecting to verification...");
-        toast.success("Account created! Please check your email for verification.");
-        
-        // Sign out the user to trigger the auth state change
-        await supabase.auth.signOut();
-        
-        // Redirect to login with a success message
-        navigate('/auth', { 
-          state: { 
-            message: 'Registration successful! Please check your email to verify your account.',
-            showLoginTab: true
-          } 
-        });
-      }
-    } catch (error: any) {
-      console.error("❌ Full signup error:", error);
-      
-      // Check if user was created despite error
-      if (error.message?.includes("already registered") || error.message?.includes("User already registered")) {
-        console.log("⚠️ User exists, redirecting to verify anyway...");
-        toast.info("Account exists. Redirecting to verification...");
-        setLoading(false);
-        setTimeout(() => {
-          window.location.href = "/verify";
-        }, 500);
-      } else {
-        toast.error(error.message || "An error occurred during sign up");
-        setLoading(false);
-      }
+    try {
+      await login(email, password);
+      // The actual redirect will be handled by the UserContext
+    } catch (error) {
+      console.error("Login error:", error);
+      // Error is already handled in the login function
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -231,7 +145,7 @@ const Auth = () => {
             </TabsList>
 
             <TabsContent value="signup">
-              <form onSubmit={handleEmailSignUp} className="space-y-4">
+              <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signup-fullname">Full Name</Label>
                   <Input
@@ -297,7 +211,7 @@ const Auth = () => {
             </TabsContent>
 
             <TabsContent value="login">
-              <form onSubmit={handleEmailSignIn} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email</Label>
                   <Input
