@@ -26,6 +26,7 @@ import Wallet from "./pages/Wallet";
 import KYC from "./pages/KYC";
 import Admin from "./pages/Admin";
 import Verify from "./pages/Verify";
+import ContestDetails from "./pages/ContestDetails";
 import NotFound from "./pages/NotFound";
 
 const HomePage: React.FC = () => {
@@ -107,6 +108,7 @@ const App: React.FC = () => {
             <Route path="/withdrawal" element={<Withdrawal />} />
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/contest" element={<LiveContest />} />
+            <Route path="/contest/:contestId" element={<ContestDetails />} />
             <Route path="/kyc" element={<KYC />} />
 
             {/* Admin Routes */}

@@ -1,4 +1,4 @@
-import { Trophy, User, LogOut, BarChart3, Home, Menu, X, Settings, Phone, Wallet, Shield, ChevronDown, Award, ArrowDownToLine } from "lucide-react";
+import { Trophy, User, LogOut, BarChart3, Home, Menu, X, Settings, Phone, Wallet, Shield, ChevronDown, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -84,10 +84,6 @@ const Navbar = () => {
               <Home className="h-4 w-4" />
               Dashboard
             </Link>
-            <Link to="/contest" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
-              <Trophy className="h-4 w-4" />
-              Contest
-            </Link>
             <Link to="/progress" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Progress
@@ -96,13 +92,13 @@ const Navbar = () => {
               <Award className="h-4 w-4" />
               Leaderboard
             </Link>
-            <Link to="/wallet" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              Wallet
-            </Link>
             <Link to="/withdrawal" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
-              <ArrowDownToLine className="h-4 w-4" />
+              <Wallet className="h-4 w-4" />
               Withdraw
+            </Link>
+            <Link to="/contest" className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Contest
             </Link>
             {profile?.role === 'admin' && (
               <Link to="/admin" className="text-foreground hover:text-primary transition-colors flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-md">

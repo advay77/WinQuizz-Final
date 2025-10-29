@@ -18,7 +18,20 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("login");
+  const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.showLoginTab) {
+      setActiveTab('login');
+      if (location.state.message) {
+        toast.success(location.state.message);
+        // Clear the state to prevent showing the message again on refresh
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state]);
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,17 +128,18 @@ const Auth = () => {
         }
 
         console.log("🎉 Signup complete! Redirecting to verification...");
-        toast.success("Account created! Redirecting to verification...");
+        toast.success("Account created! Please check your email for verification.");
         
-        // Force navigation immediately
-        console.log("🔄 Attempting navigation to /verify...");
-        console.log("Current URL:", window.location.href);
+        // Sign out the user to trigger the auth state change
+        await supabase.auth.signOut();
         
-        // Use window.location for guaranteed redirect
-        setTimeout(() => {
-          console.log("⚡ Forcing redirect with window.location...");
-          window.location.href = "/verify";
-        }, 100);
+        // Redirect to login with a success message
+        navigate('/auth', { 
+          state: { 
+            message: 'Registration successful! Please check your email to verify your account.',
+            showLoginTab: true
+          } 
+        });
       }
     } catch (error: any) {
       console.error("❌ Full signup error:", error);

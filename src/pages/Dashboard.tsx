@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +38,14 @@ type UpcomingContest = {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [contests, setContests] = useState<Contest[]>([]);
   const [upcomingContests, setUpcomingContests] = useState<UpcomingContest[]>([]);
+
+  const handleContestClick = (contestId: string) => {
+    // Navigate to contest details with the contest ID
+    navigate(`/contest/${contestId}`);
+  };
 
   useEffect(() => {
     // TODO: Replace with Supabase fetch
@@ -131,7 +138,10 @@ export default function Dashboard() {
                     <span>Starts in</span>
                     <span className="font-semibold text-black">{contest.startsIn}</span>
                   </div>
-                  <Button className="bg-red-600 hover:bg-red-700 w-full sm:w-auto">
+                  <Button 
+                    className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+                    onClick={() => handleContestClick(contest.id)}
+                  >
                     Buy Ticket & Join Contest
                   </Button>
                 </div>
